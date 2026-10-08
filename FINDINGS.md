@@ -124,17 +124,45 @@ Two header fields were also wrong for a Mega Drive, and are now set: `$190`
 I/O support was blank (now `J`, joypad) and `$1F0` region said `4`, US NTSC
 only (now `JUE`). Both sit below `$200`, so the checksum is unaffected.
 
+## Every Pico I/O access is now gone
+
+Leaving the pad, sound and control accesses in place was wrong, and OpenEmu
+showed it: the same ROM ran in Genesis Plus GX and PicoDrive and stayed black
+there. A read of `$800003` on a Mega Drive returns whatever the bus happens to
+hold, which is a different value in every emulator and on hardware, so the game
+was taking a different path everywhere. That is not a port.
+
+All ten sites are now replaced, same length each time:
+
+| site | was | is |
+|---|---|---|
+| `$0003FE` | `move.b $800003.l,$f80b.w` | `move.b #$FF,$f80b.w` (active low: nothing pressed) |
+| `$000B66` | `move.b d7,$800017.l` | `nop` |
+| six sites | `move.w ...,$800012.l` | `nop` |
+| `$06D1D4` | `tst.b $800012.l` | `moveq #0,d0`, so the `bpl` after it goes the same way every time |
+| `$06D202` | `move.w (a1),d0` (the FIFO count, `a1` = `$800010`) | `moveq #0,d0`, which makes the `beq` below it taken and the `dbra` loop that streams samples into `$800010` unreachable |
+
+The `lea $800010.l,a1` at `$06D1EA` stays, because nothing dereferences it any
+more and removing it would leave a stale `a1` for anything that did. The I/O
+scan confirms it is the only `$8000xx` left and that it is never read or
+written.
+
+The pad site is where the real Mega Drive pad read goes once the bit mapping is
+known. Until then it is a fixed "nothing pressed", which at least behaves the
+same everywhere.
+
 ## What `patch.py` does today
 
 | | |
 |---|---|
+| Pico I/O | all ten sites neutralised: no `$8000xx` access left |
 | TMSS | unlocked at reset, guarded by the `$A10001` version check |
 | header `$190` / `$1F0` | joypad declared, region `JUE` instead of `4` |
 | page sensor | fixed at a chosen page, `--page 0` to `5` |
 | console string at `$100` | `SEGA MEGA DRIVE ` |
 | header checksum at `$18E` | recomputed over `$000200` to the end |
-| input | **not patched**, mapping unknown |
-| sound | **not patched**, polls not yet classified |
+| input | fixed "nothing pressed"; the real pad needs the bit mapping |
+| sound | silenced at the source: no writes reach the absent chip |
 | audio | out of scope |
 
 So the question this build answers is only: **does it boot and reach page N's

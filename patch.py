@@ -29,6 +29,33 @@ PAGE_SITE = 0x00038E
 PAGE_READ = bytes.fromhex("10390080000d")
 NOP = bytes.fromhex("4e71")
 
+# Every remaining access to Pico I/O, which does not exist on a Mega Drive. Leaving them in
+# means the game reads whatever the bus happens to hold, which differs between emulators and
+# hardware: the same ROM then behaves differently everywhere, and that is not a port.
+#
+# (site, what must be there, what replaces it). Same length every time.
+IO_SITES = [
+    # The pad: a fixed "nothing pressed" instead of an open-bus read. Active low, so $FF,
+    # which the game's own `not.b` turns into no buttons. This is where the Mega Drive pad
+    # read goes once the bit mapping is known.
+    (0x0003FE, "11f900800003f80b", "11fc00fff80b" + "4e71"),
+    # Write-only control: nothing reads it back, so it just goes.
+    (0x000B66, "13c700800017", "4e71" * 3),
+    # Sound command writes: six of them, all stores into a chip that is not there.
+    (0x06D1C8, "33c000800012", "4e71" * 3),
+    (0x06D22A, "33c000800012", "4e71" * 3),
+    (0x06D29E, "33c000800012", "4e71" * 3),
+    (0x06D2BA, "33c000800012", "4e71" * 3),
+    (0x06D2E6, "33fc800000800012", "4e71" * 4),
+    (0x06D2EE, "33fc088000800012", "4e71" * 4),
+    # The one sound READ of $800012, and `bpl` after it: moveq clears N, so it branches the
+    # same way every time instead of on bus noise.
+    (0x06D1D4, "4a3900800012", "7000" + "4e71" * 2),
+    # The FIFO count read through a1 ($800010). Zero makes the `beq` below it taken, which
+    # skips the dbra loop that streams sample words into the same dead address.
+    (0x06D202, "3011", "7000"),
+]
+
 
 def tmss_stub(reset_pc):
     """Unlock the VDP on a TMSS console, then run the game.
@@ -103,7 +130,14 @@ def main(argv):
     expect(rom, PAGE_SITE, PAGE_READ, "page sensor read")
     rom[PAGE_SITE:PAGE_SITE + 6] = bytes([0x70, 1 << page]) + NOP + NOP
 
-    # 2. TMSS. The stub goes in filler and the reset vector points at it, so the unlock
+    # 2. Pico I/O: every access replaced, so the ROM touches no absent hardware.
+    for at, want, repl in IO_SITES:
+        want, repl = bytes.fromhex(want), bytes.fromhex(repl)
+        assert len(want) == len(repl), "%06X: %d bytes becomes %d" % (at, len(want), len(repl))
+        expect(rom, at, want, "Pico I/O site $%06X" % at)
+        rom[at:at + len(repl)] = repl
+
+    # 3. TMSS. The stub goes in filler and the reset vector points at it, so the unlock
     #    runs before anything else and the game's own code is untouched.
     reset_pc = struct.unpack_from(">I", rom, RESET_VECTOR)[0]
     code, parts = tmss_stub(reset_pc)
@@ -111,7 +145,7 @@ def main(argv):
     rom[STUB_AT:STUB_AT + len(code)] = code
     struct.pack_into(">I", rom, RESET_VECTOR, STUB_AT)
 
-    # 3. Header, so a Mega Drive and a flashcart menu accept it.
+    # 4. Header, so a Mega Drive and a flashcart menu accept it.
     rom[0x100:0x110] = CONSOLE
     rom[IO_SUPPORT_AT:IO_SUPPORT_AT + len(IO_SUPPORT)] = IO_SUPPORT
     rom[REGION_AT:REGION_AT + len(REGION)] = REGION
@@ -126,7 +160,8 @@ def main(argv):
     print("I/O support      : %s (joypad)" % IO_SUPPORT.decode().strip())
     print("region           : %s" % REGION.decode().strip())
     print("header checksum  : $%04X" % checksum(rom))
-    print("NOT patched yet  : input ($800003), sound ($800012)")
+    print("Pico I/O         : %d sites neutralised, no $8000xx access left" % len(IO_SITES))
+    print("NOT patched yet  : real pad input (the bit mapping is still unknown)")
     print("wrote %s (%d bytes)" % (argv[2], len(rom)))
 
 

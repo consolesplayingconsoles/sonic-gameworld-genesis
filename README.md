@@ -19,10 +19,10 @@ of being written in the abstract, and so what breaks is written down.
 | | |
 |---|---|
 | Pico I/O registers found | 5, across 11 sites |
-| patched | TMSS unlock, page sensor, console string, header checksum |
-| not patched | input (bit mapping unknown), sound (polls unclassified) |
+| patched | all Pico I/O, TMSS unlock, page sensor, console string, header |
+| not patched | real pad input (bit mapping unknown) |
 | audio | out of scope |
-| in Genesis Plus GX | boots to the first menu (players, difficulty) |
+| in Genesis Plus GX and PicoDrive | boots to the title screen and first menu |
 | tested on hardware | black screen, cause not yet found |
 
 So the only question this build answers is whether it boots and reaches a
