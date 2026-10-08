@@ -77,10 +77,41 @@ Written once with `$40`, never read back anywhere in the trace. Left alone
 deliberately: a write to absent hardware costs nothing, and a read we guessed
 wrong about would hang.
 
+## TMSS: why the first build booted black
+
+The first build reached a Mega Drive and showed a black screen with no sound.
+The trace says why, and it is not the sound hardware.
+
+This ROM's only hardware writes are `$C00000` and `$C00004` (VDP data and
+control) and `$C00011` (PSG). It never writes `$A14000`, and no Pico game ever
+would: TMSS is a Mega Drive thing, so a Pico game has nothing to unlock.
+
+On a Mega Drive that has TMSS, the VDP stays locked until something writes
+`'SEGA'` to `$A14000`. The console boots, the 68000 runs the game, and nothing
+it draws reaches the screen. A black screen with no sound is exactly the
+symptom.
+
+The fix is a 28-byte stub, written into the `$FF` filler at `$07F800` so
+nothing moves and the ROM does not grow, with the reset vector at `$004`
+pointed at it:
+
+```
+07F800  103900a10001           move.b  $a10001.l, d0     ; TMSS present?
+07F806  0200000f               andi.b  #$f, d0
+07F80A  670a                   beq.b   $7f816            ; no: skip the write
+07F80C  23fc5345474100a14000   move.l  #'SEGA', $a14000.l
+07F816  4ef900000210           jmp     $210.l            ; the game's own reset
+```
+
+The displacement is computed from the layout and asserted to land on an
+instruction boundary, then checked by disassembling the built ROM: `beq.b`
+goes to `$07F816`, which is where `jmp` starts.
+
 ## What `patch.py` does today
 
 | | |
 |---|---|
+| TMSS | unlocked at reset, guarded by the `$A10001` version check |
 | page sensor | fixed at a chosen page, `--page 0` to `5` |
 | console string at `$100` | `SEGA MEGA DRIVE ` |
 | header checksum at `$18E` | recomputed over `$000200` to the end |
@@ -89,4 +120,7 @@ wrong about would hang.
 | audio | out of scope |
 
 So the question this build answers is only: **does it boot and reach page N's
-activity on a Mega Drive?** It cannot be played yet.
+activity on a Mega Drive?** It cannot be played yet. If it still shows nothing
+after the TMSS fix, the next suspect is the sound busy poll at `$800012`: 7
+sites, and any one of them that waits in a loop waits forever on a chip that
+is not there.

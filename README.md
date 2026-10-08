@@ -19,10 +19,10 @@ of being written in the abstract, and so what breaks is written down.
 | | |
 |---|---|
 | Pico I/O registers found | 5, across 11 sites |
-| patched | page sensor, console string, header checksum |
+| patched | TMSS unlock, page sensor, console string, header checksum |
 | not patched | input (bit mapping unknown), sound (polls unclassified) |
 | audio | out of scope |
-| tested on hardware | not yet |
+| tested on hardware | first build booted black: TMSS, now fixed |
 
 So the only question this build answers is whether it boots and reaches a
 page's activity. You cannot play it yet, and the reason input is missing is

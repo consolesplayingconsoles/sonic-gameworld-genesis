@@ -12,11 +12,54 @@ import sys
 
 CONSOLE = b"SEGA MEGA DRIVE "      # 16 bytes at $100, space padded
 CHECKSUM_AT = 0x18E
+RESET_VECTOR = 0x004
+
+# Where the TMSS stub goes: inside the existing $FF filler near the end of the ROM, so
+# nothing moves and the ROM does not grow. Checked before it is written.
+STUB_AT = 0x07F800
 
 # move.b $80000d.l, d0  -- the page sensor read, 6 bytes at this address.
 PAGE_SITE = 0x00038E
 PAGE_READ = bytes.fromhex("10390080000d")
 NOP = bytes.fromhex("4e71")
+
+
+def tmss_stub(reset_pc):
+    """Unlock the VDP on a TMSS console, then run the game.
+
+    A Pico has no TMSS, so a Pico game never writes 'SEGA' to $A14000 and never needed to.
+    A Mega Drive that has one leaves the VDP locked until something does, which is a black
+    screen and no sound: the console boots, the game runs, nothing can draw.
+
+    The check first: $A10001's low nibble is 0 on a console without TMSS, where writing
+    $A14000 would be a write into nothing.
+    """
+    parts = [
+        ("move.b ($A10001).l,d0", bytes.fromhex("103900a10001")),
+        ("andi.b #$0F,d0", bytes.fromhex("0200000f")),
+        ("beq.b skip", None),                                      # filled in below
+        ("move.l #'SEGA',($A14000).l", bytes.fromhex("23fc5345474100a14000")),
+        ("jmp reset.l", bytes.fromhex("4ef9") + struct.pack(">I", reset_pc)),
+    ]
+    # The displacement is computed from the layout, never written by hand: it is measured
+    # from the END of the 2-byte branch to the first byte after the move.l it skips.
+    sizes = [2 if b is None else len(b) for _, b in parts]
+    after_branch = sum(sizes[:3])
+    skip = sum(sizes[:4])
+    disp = skip - after_branch
+    assert 0 < disp < 0x80, disp
+    parts[2] = ("beq.b +%d" % disp, bytes([0x67, disp]))
+
+    code = b"".join(b for _, b in parts)
+    # Every branch must land on an instruction boundary: here, exactly where the jmp starts.
+    boundaries = set()
+    at = 0
+    for _, b in parts:
+        boundaries.add(at)
+        at += len(b)
+    assert after_branch + disp in boundaries, "beq lands mid-instruction"
+    assert len(code) == at
+    return code, parts
 
 
 def expect(rom, at, want, what):
@@ -54,12 +97,23 @@ def main(argv):
     expect(rom, PAGE_SITE, PAGE_READ, "page sensor read")
     rom[PAGE_SITE:PAGE_SITE + 6] = bytes([0x70, 1 << page]) + NOP + NOP
 
-    # 2. Header, so a Mega Drive and a flashcart menu accept it.
+    # 2. TMSS. The stub goes in filler and the reset vector points at it, so the unlock
+    #    runs before anything else and the game's own code is untouched.
+    reset_pc = struct.unpack_from(">I", rom, RESET_VECTOR)[0]
+    code, parts = tmss_stub(reset_pc)
+    expect(rom, STUB_AT, b"\xFF" * len(code), "free space for the TMSS stub")
+    rom[STUB_AT:STUB_AT + len(code)] = code
+    struct.pack_into(">I", rom, RESET_VECTOR, STUB_AT)
+
+    # 3. Header, so a Mega Drive and a flashcart menu accept it.
     rom[0x100:0x110] = CONSOLE
     struct.pack_into(">H", rom, CHECKSUM_AT, checksum(rom))
 
     open(argv[2], "wb").write(bytes(rom))
     print("page sensor      : fixed at page %d (bit %d)" % (page, page))
+    print("TMSS unlock      : $%06X, %d bytes, reset was $%06X" % (STUB_AT, len(code), reset_pc))
+    for name, b in parts:
+        print("                   %-26s %s" % (name, b.hex()))
     print("console string   : %s" % CONSOLE.decode())
     print("header checksum  : $%04X" % checksum(rom))
     print("NOT patched yet  : input ($800003), sound ($800012)")
