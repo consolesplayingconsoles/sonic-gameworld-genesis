@@ -12,6 +12,12 @@ import sys
 
 CONSOLE = b"SEGA MEGA DRIVE "      # 16 bytes at $100, space padded
 CHECKSUM_AT = 0x18E
+
+# A Pico declares neither of these, having no joypad and one region. A Mega Drive ROM says
+# which devices it uses ($190) and which regions it is for ($1F0); this one's says "4", US
+# NTSC only, which is not what a converted ROM should claim.
+IO_SUPPORT_AT, IO_SUPPORT = 0x190, b"J" + b" " * 15
+REGION_AT, REGION = 0x1F0, b"JUE" + b" " * 13
 RESET_VECTOR = 0x004
 
 # Where the TMSS stub goes: inside the existing $FF filler near the end of the ROM, so
@@ -107,6 +113,8 @@ def main(argv):
 
     # 3. Header, so a Mega Drive and a flashcart menu accept it.
     rom[0x100:0x110] = CONSOLE
+    rom[IO_SUPPORT_AT:IO_SUPPORT_AT + len(IO_SUPPORT)] = IO_SUPPORT
+    rom[REGION_AT:REGION_AT + len(REGION)] = REGION
     struct.pack_into(">H", rom, CHECKSUM_AT, checksum(rom))
 
     open(argv[2], "wb").write(bytes(rom))
@@ -115,6 +123,8 @@ def main(argv):
     for name, b in parts:
         print("                   %-26s %s" % (name, b.hex()))
     print("console string   : %s" % CONSOLE.decode())
+    print("I/O support      : %s (joypad)" % IO_SUPPORT.decode().strip())
+    print("region           : %s" % REGION.decode().strip())
     print("header checksum  : $%04X" % checksum(rom))
     print("NOT patched yet  : input ($800003), sound ($800012)")
     print("wrote %s (%d bytes)" % (argv[2], len(rom)))

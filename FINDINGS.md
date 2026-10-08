@@ -107,11 +107,29 @@ The displacement is computed from the layout and asserted to land on an
 instruction boundary, then checked by disassembling the built ROM: `beq.b`
 goes to `$07F816`, which is where `jmp` starts.
 
+## It runs in Genesis Plus GX
+
+The build that showed a black screen on hardware boots in Genesis Plus GX,
+through the Sega Pico logo and into the game's first menu, with the pen cursor
+drawn:
+
+> How Many Players? One / Two. Difficulty Level: Easy / Hard.
+
+So page 0 is a real activity and the conversion's logic is sound. Whatever
+blacks the screen is something the emulator does not model, and the first
+candidate is the thing it cannot model here: TMSS. Genesis Plus GX emulates it
+only with a boot ROM in its system folder, and there is none.
+
+Two header fields were also wrong for a Mega Drive, and are now set: `$190`
+I/O support was blank (now `J`, joypad) and `$1F0` region said `4`, US NTSC
+only (now `JUE`). Both sit below `$200`, so the checksum is unaffected.
+
 ## What `patch.py` does today
 
 | | |
 |---|---|
 | TMSS | unlocked at reset, guarded by the `$A10001` version check |
+| header `$190` / `$1F0` | joypad declared, region `JUE` instead of `4` |
 | page sensor | fixed at a chosen page, `--page 0` to `5` |
 | console string at `$100` | `SEGA MEGA DRIVE ` |
 | header checksum at `$18E` | recomputed over `$000200` to the end |
