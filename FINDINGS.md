@@ -208,6 +208,21 @@ after the game's own inversion:
 | B | `1000` | bit 4, the red button |
 | Start | `8000` | bit 7, the pen |
 
+## OpenEmu: unexplained, not fixed
+
+OpenEmu showed a black screen on every build tried, including one with no
+absent-hardware access left. **This was never reproduced and never diagnosed.**
+Genesis Plus GX and PicoDrive both ran every one of those builds; PicoDrive
+looked like a reproduction and was not, it was simply mid-intro.
+
+So there is no evidence about OpenEmu either way. Its Mega Drive core is the
+older GenesisPlus plugin rather than GX, which is a plausible reason and
+nothing more. If it matters later, the test is to compare against that bundled
+core directly rather than against a third emulator.
+
+Pluto now opens Mega Drive ROMs in RetroArch rather than OpenEmu, so the thing
+you press Play on is the thing these findings were measured in.
+
 ## What `patch.py` does today
 
 | | |
