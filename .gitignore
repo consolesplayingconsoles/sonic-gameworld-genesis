@@ -1,0 +1,4 @@
+build/
+rom/
+.env
+.DS_Store
