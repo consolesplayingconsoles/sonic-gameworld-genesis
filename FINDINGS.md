@@ -151,6 +151,63 @@ The pad site is where the real Mega Drive pad read goes once the bit mapping is
 known. Until then it is a fixed "nothing pressed", which at least behaves the
 same everywhere.
 
+## The pad works, and the register map was wrong
+
+Genesis Plus GX emulates the Pico itself, and its source is the authority this
+project had been inferring around. Reading it corrected the map in three
+places and handed over the one thing tracing could not reach:
+
+| | this project had | the core says |
+|---|---|---|
+| `$800001` | unknown | **VERSION register** (region code) |
+| `$800003` | pad, active low | pad, active low, `~input.pad[0]` |
+| `$800005`/`$800007` | pen X, pen Y | **pen X, MSB and LSB** |
+| `$800009`/`$80000B` | not seen | **pen Y, MSB and LSB** |
+| `$80000D` | page, one bit per page | page, `(1 << pages) - 1`: a **mask**, not one bit |
+| `$800010`/`$800011` | sound base | ADPCM data, reads `$FF` |
+| `$800012` | sound command + busy | ADPCM control, reads **`$80`** |
+
+The mask detail does not change this patch: the game's loop takes the *highest*
+set bit, so one bit at N and a mask of N+1 bits give the same page. The `$80`
+does: the `tst.b`/`bpl` pair sees a negative value on a Pico, so the branch is
+not taken, and the replacement is now `moveq #-1` rather than `moveq #0`.
+
+### The pad byte
+
+`$800003` is active low with **bit 0 up, 1 down, 2 left, 3 right, 4 red,
+7 pen**, which is exactly why the game ors `$60` over bits 5 and 6 before
+inverting: those two are unused.
+
+A Mega Drive pad's TH=1 read is also active low, with bits 0-3 in the **same
+order** and bit 4 the B button. So four directions and the red button need no
+rearranging whatsoever: force the unused bits high and the byte is already
+Pico-shaped. Start stands in for the pen, the one thing a pad cannot be.
+
+```
+07F820  move.b #$40,$a10009.l   TH is an output
+07F828  move.b #$40,$a10003.l   TH high
+07F834  move.b $a10003.l,d0     ..CBRLDU, active low
+07F83A  move.b #$00,$a10003.l   TH low
+07F846  move.b $a10003.l,d1     ..SA..DU
+07F84C  ori.b #$e0,d0           unused bits and pen high
+07F850  btst #5,d1              Start held?
+07F854  bne.b $7f85a
+07F856  bclr #7,d0              yes: pen down
+07F85A  move.b d0,$f80b.w       where the Pico read used to land
+07F85E  rts
+```
+
+Measured in Genesis Plus GX by holding each button and reading `$FFF80A`
+after the game's own inversion:
+
+| held | `$FFF80A` | |
+|---|---|---|
+| nothing | `0000` | |
+| Down | `0200` | bit 1 |
+| Right | `0800` | bit 3 |
+| B | `1000` | bit 4, the red button |
+| Start | `8000` | bit 7, the pen |
+
 ## What `patch.py` does today
 
 | | |
@@ -161,7 +218,7 @@ same everywhere.
 | page sensor | fixed at a chosen page, `--page 0` to `5` |
 | console string at `$100` | `SEGA MEGA DRIVE ` |
 | header checksum at `$18E` | recomputed over `$000200` to the end |
-| input | fixed "nothing pressed"; the real pad needs the bit mapping |
+| input | the Mega Drive pad: D-pad, B as the red button, Start as the pen |
 | sound | silenced at the source: no writes reach the absent chip |
 | audio | out of scope |
 

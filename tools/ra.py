@@ -41,9 +41,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROM_DIR = os.path.join(HERE, '..', 'rom')
 WORK_RAM = 0xFF0000                               # 68000 work RAM, 64 KB
 
-# RetroPad ids as Genesis Plus GX maps them.
-PAD = {'A': 0, 'B': 8, 'C': 9, 'START': 3, 'UP': 4, 'DOWN': 5, 'LEFT': 6, 'RIGHT': 7,
-       'X': 10, 'Y': 1, 'Z': 11, 'MODE': 2}
+# RetroPad ids as Genesis Plus GX maps them: RetroPad Y->A, B->B, A->C, measured by
+# holding each one and reading the byte the game stores its pad in.
+PAD = {'A': 1, 'B': 0, 'C': 8, 'START': 3, 'UP': 4, 'DOWN': 5, 'LEFT': 6, 'RIGHT': 7,
+       'X': 9, 'Y': 10, 'Z': 11, 'MODE': 2}
 JOYPAD, ANALOG = 1, 5
 
 

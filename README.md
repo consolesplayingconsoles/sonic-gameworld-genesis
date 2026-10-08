@@ -20,15 +20,16 @@ of being written in the abstract, and so what breaks is written down.
 |---|---|
 | Pico I/O registers found | 5, across 11 sites |
 | patched | all Pico I/O, TMSS unlock, page sensor, console string, header |
-| not patched | real pad input (bit mapping unknown) |
+| not patched | pen coordinates (a pad cannot point) |
 | audio | out of scope |
 | in Genesis Plus GX and PicoDrive | boots to the title screen and first menu |
 | tested on hardware | black screen, cause not yet found |
 
-So the only question this build answers is whether it boots and reaches a
-page's activity. You cannot play it yet, and the reason input is missing is
-written down rather than guessed at: see [FINDINGS.md](FINDINGS.md), which
-quotes the decoded code behind every claim here.
+The pad works: D-pad, B as the Pico's red button, Start standing in for the
+pen. What it cannot do is point, because the pen is an absolute coordinate and
+a pad has none, so anything that needs a cursor placed somewhere specific is
+still out of reach. [FINDINGS.md](FINDINGS.md) quotes the decoded code and the
+measurements behind every claim here.
 
 ## Build
 
