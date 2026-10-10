@@ -248,8 +248,10 @@ older GenesisPlus plugin rather than GX, which is a plausible reason and
 nothing more. If it matters later, the test is to compare against that bundled
 core directly rather than against a third emulator.
 
-Pluto now opens Mega Drive ROMs in RetroArch rather than OpenEmu, so the thing
-you press Play on is the thing these findings were measured in.
+Pluto plays Mega Drive ROMs in OpenEmu on purpose. Its core is the strict one:
+hardware proved it right about this ROM while two lenient cores ran it happily,
+so Play failing there is the early warning that the cartridge would be black.
+The RetroArch entry stays configured for when you want the lenient view.
 
 ## What `patch.py` does today
 
