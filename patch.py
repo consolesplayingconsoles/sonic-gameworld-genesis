@@ -33,7 +33,8 @@ PAGE_VAR = 0xFB00          # absolute short: $FFFB00. The page, 0 = closed, 1-6 
 PREV_VAR = 0xFB01          # last frame's page buttons, so a hold is not a repeat
 CURSOR_READY = 0xFB11      # RAM boots cleared, so the cursor centres itself once
 CURSOR_X = 0xFB12          # where the pen is, 0 to 320
-CURSOR_Y = 0xFB14          # 0 to 251, the tablet's own span, not the screen's
+CURSOR_Y = 0xFB14          # 0 to 227: measured against the screen, since the hand tracks
+                           # Y about 1:1 and the tablet's full 251 would sit below it
 PEN_X = 0xFB16             # what the game reads instead of $800005: cursor + $3C
 PEN_Y = 0xFB18             # ... instead of $800009: cursor + $1FC
 MODE_VAR = 0xFB1B          # 0 = the D-pad moves the hand, 1 = it reaches the game
@@ -298,7 +299,7 @@ def pad_stub():
         (">haveCursor", None),
         ("mark ready", "11fc0001fb11"),
         ("centre x", "31fc00a0fb12"),
-        ("centre y", "31fc007dfb14"),
+        ("centre y", "31fc0070fb14"),
         ("mode for cursor", "4a38fb1b"),            # haveCursor: only in hand mode
         (">noCursor2", None),
         ("load x", "3638fb12"),
@@ -322,9 +323,9 @@ def pad_stub():
         ("test down2", "08020007"),                 # noUp2:
         ("=noDown2", None),
         ("y plus", "5444"),
-        ("cmp y max", "0c4400fb"),
+        ("cmp y max", "0c4400e3"),
         ("LnoDown2", None),
-        ("y ceil", "383c00fb"),
+        ("y ceil", "383c00e3"),
         ("store x", "31c3fb12"),                    # noDown2:
         ("store y", "31c4fb14"),
 
@@ -338,7 +339,14 @@ def pad_stub():
         # on the tablet, and that is what makes the hand visible. The click is the tip
         # switch, bit 7 of the Pico byte, which B already sets above.
 
-        ("store pen x", "31c3fb16"),                # penDown:
+        # In game mode the pen is not in use, so report it off the tablet: the game stops
+        # drawing its hand, which is the mode indicator, using its own art and adding
+        # nothing to the screen.
+        ("pen in use?", "4a38fb1b"),
+        ("=penOnTablet", None),
+        ("x off tablet", "00438000"),
+        ("y off tablet", "00448000"),
+        ("store pen x", "31c3fb16"),                # penOnTablet:
         ("store pen y", "31c4fb18"),
         ("restore", "4cdf001f"),                    # movem.l (a7)+,d0-d4
         ("return", "4e75"),
@@ -364,7 +372,7 @@ def pad_stub():
         "=noRight2": "test up2", "LnoRight2": "test up2",
         "=noUp2": "test down2", "+noUp2": "test down2",
         "=noDown2": "store x", "LnoDown2": "store x",
-
+        "=penOnTablet": "store pen x",
     }
     parts = [(n, None if h is None else bytes.fromhex(h)) for n, h in P]
     names = [n for n, _ in parts]

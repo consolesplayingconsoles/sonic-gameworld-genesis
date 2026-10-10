@@ -439,6 +439,14 @@ game draws its hand all the time and selects nothing, and B presses the tip
 switch to click. **No cursor rendering is needed**: the game has always drawn
 one, it just had to be told the pen was there.
 
+## The mode shows itself
+
+In game mode the pen is reported off the tablet, since it is not in use. The
+game does not hide its hand then: it draws it at its idle position, bottom
+right. So the hand following the cursor means the D-pad is the pen, and the
+hand parked in the corner means the D-pad is the game's, which is the mode
+indicator with nothing added to the screen and no colour carrying meaning.
+
 ## The pen cursor
 
 The game decodes the pen like this, which is the whole contract a substitute

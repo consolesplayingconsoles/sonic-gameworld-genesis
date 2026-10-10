@@ -45,7 +45,7 @@ Writes `rom/` (gitignored) and an `.ips` beside it.
 | pad | Pico |
 |---|---|
 | D-pad | moves the hand, which is always on screen |
-| A | switches the D-pad between the hand and the game's own directions |
+| A | switches the D-pad between the hand and the game's own directions; the hand parks in the corner while the game has it |
 | B | taps where the hand is |
 | C held + Left/Right | turns the storybook page, wrapping through closed |
 | Start | the red button (red for red) |
