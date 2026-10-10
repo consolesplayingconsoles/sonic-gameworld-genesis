@@ -366,6 +366,39 @@ hardware proved it right about this ROM while two lenient cores ran it happily,
 so Play failing there is the early warning that the cartridge would be black.
 The RetroArch entry stays configured for when you want the lenient view.
 
+## Audio: the PSG survives, the samples do not
+
+Worth stating because the README said the opposite. A Pico and a Mega Drive
+share the **PSG**, the same chip at `$C00011`. This game drives it from ten
+sites and the conversion touches none of them, so its music and beeps play
+exactly as before, with no work done.
+
+What is gone is the Pico's **ADPCM** behind `$800010`/`$800012`, the sampled
+voice and effects, which has no counterpart on a Mega Drive. The game never
+touches a YM2612, so there is no FM on either machine.
+
+So the expectation for a Pico conversion is: keep whatever the game put on the
+PSG, lose the samples.
+
+## Where this is parked
+
+The conversion boots and plays. What is unfinished is the pen's *calibration*,
+and the next person (or the next session) starts here:
+
+1. **The game smooths the pen.** `$0007A4` pushes each (X,Y) into an 8-entry
+   ring buffer at `$FFF82A`, and `$0006BC` takes the min and max of those
+   eight. It trusts a position only once the samples agree, so on pen-down the
+   first result mixes stale entries with the cursor and the pointer appears
+   somewhere fixed rather than where the cursor is. Priming the buffer with the
+   current cursor when the pen goes down should remove that.
+2. **The ranges do not match.** The game clamps X to `0..$15F` (351) and Y to
+   `0..$1FF` (511); the cursor clamps to 0..320 and 0..223 and centres at
+   (160,112). If the game maps its wider space onto a 320x224 screen, that
+   "centre" lands left and high, which is what it does.
+3. **Read the hand sprite's positioning** from `$FFF81A`/`$FFF81C` before
+   choosing numbers. The scale factor is in there; guessing it is how you get
+   a cursor that is subtly wrong everywhere.
+
 ## The pen cursor
 
 The game decodes the pen like this, which is the whole contract a substitute

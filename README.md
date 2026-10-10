@@ -19,7 +19,7 @@ instead.
 | Pico I/O registers found | 5, across 11 sites |
 | patched | Z80 silenced, all Pico I/O including the $800015 handshake, TMSS unlock, page sensor, console string, header |
 | not patched | nothing known |
-| audio | out of scope |
+| audio | the PSG plays as it always did; the Pico's sampled voice is gone |
 | in Genesis Plus GX and PicoDrive | boots to the title screen and first menu |
 | in BlastEm (accuracy core) | runs, zero unmapped accesses |
 | in OpenEmu | boots: the core that matched the console all along |
