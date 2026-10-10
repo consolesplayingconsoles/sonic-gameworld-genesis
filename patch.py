@@ -33,7 +33,7 @@ PAGE_VAR = 0xFB00          # absolute short: $FFFB00. The page, 0 = closed, 1-6 
 PREV_VAR = 0xFB01          # last frame's page buttons, so a hold is not a repeat
 CURSOR_READY = 0xFB11      # RAM boots cleared, so the cursor centres itself once
 CURSOR_X = 0xFB12          # where the pen is, 0 to 320
-CURSOR_Y = 0xFB14          # 0 to 223
+CURSOR_Y = 0xFB14          # 0 to 251, the tablet's own span, not the screen's
 PEN_X = 0xFB16             # what the game reads instead of $800005: cursor + $3C
 PEN_Y = 0xFB18             # ... instead of $800009: cursor + $1FC
 
@@ -294,7 +294,7 @@ def pad_stub():
         (">haveCursor", None),
         ("mark ready", "11fc0001fb11"),
         ("centre x", "31fc00a0fb12"),
-        ("centre y", "31fc0070fb14"),
+        ("centre y", "31fc007dfb14"),
         ("cursor held?", "08020002"),               # haveCursor: A moves the pen
         ("=noCursor2", None),
         ("load x", "3638fb12"),
@@ -318,9 +318,9 @@ def pad_stub():
         ("test down2", "08020007"),                 # noUp2:
         ("=noDown2", None),
         ("y plus", "5444"),
-        ("cmp y max", "0c4400df"),
+        ("cmp y max", "0c4400fb"),
         ("LnoDown2", None),
-        ("y ceil", "383c00df"),
+        ("y ceil", "383c00fb"),
         ("store x", "31c3fb12"),                    # noDown2:
         ("store y", "31c4fb14"),
 

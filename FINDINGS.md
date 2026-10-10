@@ -380,6 +380,28 @@ touches a YM2612, so there is no FM on either machine.
 So the expectation for a Pico conversion is: keep whatever the game put on the
 PSG, lose the samples.
 
+## How the game reads the pen, in full
+
+Not a hit test, a de-noising filter, which is what a real tablet needs:
+
+```
+0005C2  bsr.w  $65e            read raw X,Y (bit 15 = not down)
+0005D6  lea    $f82a.w, a0
+0005DA  bsr.w  $7a4            push the pair into an 8-entry ring buffer
+0005E2  bsr.w  $6bc            find min and max of each axis across the 8
+0005F0  bsr.w  $71a            weighted average of the rest
+```
+
+`$71A` walks the eight samples against the weight table at `$5AE`, which is
+`8,7,6,5,4,3,2,1`, newest first. A sample matching the minimum or the maximum
+of either axis is thrown away and that extreme is poisoned to `$FFFF`, so only
+the *first* match is discarded, and the remaining six are averaged by weight
+(`divs.w d2,d0`). A steady cursor therefore survives it fine: two samples are
+dropped as the extremes, six agree, and the average is exactly the cursor.
+
+So the hand landing on a menu label is the game **selecting the item under the
+pen**, not a glitch: the cursor is being read and used.
+
 ## Where this is parked
 
 The conversion boots and plays. What is unfinished is the pen's *calibration*,
@@ -391,10 +413,10 @@ and the next person (or the next session) starts here:
    first result mixes stale entries with the cursor and the pointer appears
    somewhere fixed rather than where the cursor is. Priming the buffer with the
    current cursor when the pen goes down should remove that.
-2. **The ranges do not match.** The game clamps X to `0..$15F` (351) and Y to
-   `0..$1FF` (511); the cursor clamps to 0..320 and 0..223 and centres at
-   (160,112). If the game maps its wider space onto a 320x224 screen, that
-   "centre" lands left and high, which is what it does.
+2. **The Y range was wrong, now fixed.** The tablet spans X `$03C-$17C` (320
+   steps) and Y `$1FC-$2F7` (251), but the cursor was clamped to the *screen's*
+   224 lines, so the bottom 11% of the tablet could not be pointed at. It now
+   spans 0..251 and centres at 125. X was already right at 0..320.
 3. **Read the hand sprite's positioning** from `$FFF81A`/`$FFF81C` before
    choosing numbers. The scale factor is in there; guessing it is how you get
    a cursor that is subtly wrong everywhere.
