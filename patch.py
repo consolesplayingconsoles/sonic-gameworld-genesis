@@ -36,6 +36,7 @@ CURSOR_X = 0xFB12          # where the pen is, 0 to 320
 CURSOR_Y = 0xFB14          # 0 to 251, the tablet's own span, not the screen's
 PEN_X = 0xFB16             # what the game reads instead of $800005: cursor + $3C
 PEN_Y = 0xFB18             # ... instead of $800009: cursor + $1FC
+MODE_VAR = 0xFB1B          # 0 = the D-pad moves the hand, 1 = it reaches the game
 
 # move.b $80000d.l, d0  -- the page sensor read, 6 bytes at this address.
 PAGE_SITE = 0x00038E
@@ -259,8 +260,8 @@ def pad_stub():
         ("test tap", "08020001"),                   # B -> pen        (noRed:)
         ("=noTap", None),
         ("set tap", "08800007"),                    # bclr #7,d0
-        ("test cursor", "08020002"),                # A: cursor owns the D-pad  (noTap:)
-        ("=noCursor", None),
+        ("test cursor", "4a38fb1b"),                # mode: the hand owns the D-pad (noTap:)
+        (">noCursor", None),
         ("drop dirs", "0000000f"),                  # ori.b #$0F,d0
         ("test pageheld", "08020000"),              # C: pages own left/right  (noCursor:)
         ("=noPageDirs", None),
@@ -272,6 +273,9 @@ def pad_stub():
         ("save prev", "11c2fb01"),
         ("invert prev", "4603"),
         ("edge", "c602"),                           # d3 = newly pressed
+        ("mode edge", "08030002"),                  # A toggles what the D-pad drives
+        ("=noMode", None),
+        ("flip mode", "0a380001fb1b"),              # eori.b #1,$FB1B.w
         ("test page mode", "08020000"),             # C held?
         ("=nopage", None),
         ("load page", "1838fb00"),
@@ -295,8 +299,8 @@ def pad_stub():
         ("mark ready", "11fc0001fb11"),
         ("centre x", "31fc00a0fb12"),
         ("centre y", "31fc007dfb14"),
-        ("cursor held?", "08020002"),               # haveCursor: A moves the pen
-        ("=noCursor2", None),
+        ("mode for cursor", "4a38fb1b"),            # haveCursor: only in hand mode
+        (">noCursor2", None),
         ("load x", "3638fb12"),
         ("load y", "3838fb14"),
         ("test left2", "08020004"),
@@ -330,10 +334,10 @@ def pad_stub():
         ("raw x offset", "0643003c"),
         ("raw y", "3838fb14"),
         ("raw y offset", "064401fc"),
-        ("pen down?", "08020001"),                  # B
-        (">penDown", None),                         # bne: held, leave bit 15 clear
-        ("x pen up", "00438000"),
-        ("y pen up", "00448000"),
+        # No "pen up" any more: the coordinates are always valid, which is the pen resting
+        # on the tablet, and that is what makes the hand visible. The click is the tip
+        # switch, bit 7 of the Pico byte, which B already sets above.
+
         ("store pen x", "31c3fb16"),                # penDown:
         ("store pen y", "31c4fb18"),
         ("restore", "4cdf001f"),                    # movem.l (a7)+,d0-d4
@@ -347,19 +351,20 @@ def pad_stub():
         ">noC": "test B", ">noB": "test A", ">noA": "test Start", ">noStart": "test Left",
         ">noLeft": "test Right", ">noRight": "test Up", ">noUp": "test Down",
         ">noDown": "mask",
-        "=noRed": "test tap", "=noTap": "test cursor", "=noCursor": "test pageheld",
+        "=noRed": "test tap", "=noTap": "test cursor", ">noCursor": "test pageheld",
         "=noPageDirs": "store pad",
+        "=noMode": "test page mode",
         # the cursor runs whether or not C is held, so skipping the pages lands on it
         "=nopage": "cursor ready?",
         "=noFwd": "test back", "<noFwd": "test back",
         "=noBack": "store page", "!noBack": "store page",
-        ">haveCursor": "cursor held?",
-        "=noCursor2": "raw x",
+        ">haveCursor": "mode for cursor",
+        ">noCursor2": "raw x",
         "=noLeft2": "test right2", "+noLeft2": "test right2",
         "=noRight2": "test up2", "LnoRight2": "test up2",
         "=noUp2": "test down2", "+noUp2": "test down2",
         "=noDown2": "store x", "LnoDown2": "store x",
-        ">penDown": "store pen x",
+
     }
     parts = [(n, None if h is None else bytes.fromhex(h)) for n, h in P]
     names = [n for n, _ in parts]
@@ -483,7 +488,8 @@ def main(argv):
     print("Pico I/O         : %d sites neutralised, no $8000xx access left" % len(IO_SITES))
     print("handshake        : $800015/$800017, %d writes and %d reads silenced"
           % (handshake["writes"], handshake["reads"]))
-    print("pen              : a cursor in RAM, A held + D-pad moves it, B taps")
+    print("pen              : always on the tablet, so the hand is always drawn;")
+    print("                   D-pad moves it, A switches D-pad to the game, B taps")
     print("wrote %s (%d bytes)" % (argv[2], len(rom)))
 
 

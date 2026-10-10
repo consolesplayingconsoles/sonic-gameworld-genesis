@@ -44,11 +44,17 @@ Writes `rom/` (gitignored) and an `.ips` beside it.
 
 | pad | Pico |
 |---|---|
-| D-pad | the Pico's D-pad |
-| Start | the red button (red for red) |
-| B | pen tap |
-| A held + D-pad | moves the pen cursor, 2 pixels a frame, clamped to the tablet |
+| D-pad | moves the hand, which is always on screen |
+| A | switches the D-pad between the hand and the game's own directions |
+| B | taps where the hand is |
 | C held + Left/Right | turns the storybook page, wrapping through closed |
+| Start | the red button (red for red) |
+
+The hand is visible all the time because the Pico reports **where** the pen is
+separately from **whether its tip is pressed**. Resting on the tablet draws the
+hand and selects nothing; the tip switch is the click. Nothing is rendered by
+the patch: the game draws its own hand, it just needed to be told the pen is
+there.
 
 There is no page sensor on a Mega Drive, and on this game the page *is* the
 mode selector, so turning it from the pad is what makes more than one of its

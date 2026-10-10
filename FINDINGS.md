@@ -421,6 +421,24 @@ and the next person (or the next session) starts here:
    choosing numbers. The scale factor is in there; guessing it is how you get
    a cursor that is subtly wrong everywhere.
 
+## Position and click are separate, which is the whole UX
+
+MAME's `segapico.cpp`, crediting notaz's Pico documentation, spells out
+`$800003`: bit 0 up, 1 down, 2 left, 3 right, 4 the red button, and **bit 7 the
+pen's tip button**, with the coordinate registers reporting where the pen is
+independently of it.
+
+Tying them together, as this patch first did, produces an unusable port: the
+hand only appears while you are clicking, so you aim blind, and sliding while
+down is a drag that the game correctly refuses to commit (tested: drag onto an
+item, lift, nothing selected; touch the same item without moving, lift, it
+selects).
+
+Reported separately it comes right. The pen is always on the tablet, so the
+game draws its hand all the time and selects nothing, and B presses the tip
+switch to click. **No cursor rendering is needed**: the game has always drawn
+one, it just had to be told the pen was there.
+
 ## The pen cursor
 
 The game decodes the pen like this, which is the whole contract a substitute
