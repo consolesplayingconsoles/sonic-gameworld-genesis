@@ -208,6 +208,39 @@ after the game's own inversion:
 | B | `1000` | bit 4, the red button |
 | Start | `8000` | bit 7, the pen |
 
+## $800015: a peripheral handshake the trace never saw
+
+The trace reaches 1.5% of this ROM, and `IO_SITES` was built from what it
+found. Scanning the **whole** ROM for decodable `$8000xx` operands turns up 28
+more sites, none of them traced:
+
+```
+000CE6  move.b  #$20, $800015.l      write a command
+000CEE  move.b  #$60, $800017.l
+000CF6  btst.b  #$4, $800015.l       wait for the answer
+000EF2  move.b  $800015.l, d0        ... and the same loop again, 24 sites in all
+000EFC  dbne    d7, $ef2
+```
+
+It is a write-then-poll handshake with a peripheral controller, and on a Mega
+Drive every one of those reads is the open bus: a different answer in every
+emulator and on hardware, so the game decides a device is or is not there based
+on noise. The loops are bounded (`dbne`/`dbeq` against `d7 = $FF`), so they
+time out rather than hang, but what the game does afterwards depends entirely
+on what the noise said.
+
+Reads are now zero and writes are gone. Zero is the game's own "nobody is
+pulling the line": one path exits at once with no data, the other spins out its
+own timeout and takes the error branch it was written to take. Both are what
+the game does when no peripheral answers, and now it is the same answer
+everywhere.
+
+**The lesson is about method, not this register.** A trace tells you what a
+game does on the paths it reached. For I/O you want every site in the ROM,
+which means decoding candidate operands across the whole image and accepting
+some false positives (art data decodes as instructions surprisingly often: of
+36 apparent hits left, every one is a `move.b #$80,$N(a6)`).
+
 ## What a scan of absolute addresses cannot see
 
 Two Pico accesses in this game never name their address: they load it into a

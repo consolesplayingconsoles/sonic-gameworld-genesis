@@ -19,7 +19,7 @@ of being written in the abstract, and so what breaks is written down.
 | | |
 |---|---|
 | Pico I/O registers found | 5, across 11 sites |
-| patched | Z80 silenced, all Pico I/O, TMSS unlock, page sensor, console string, header |
+| patched | Z80 silenced, all Pico I/O including the $800015 handshake, TMSS unlock, page sensor, console string, header |
 | not patched | pen coordinates (a pad cannot point) |
 | audio | out of scope |
 | in Genesis Plus GX and PicoDrive | boots to the title screen and first menu |

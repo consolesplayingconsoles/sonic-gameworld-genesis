@@ -121,6 +121,57 @@ def tmss_stub(reset_pc):
     return code, parts
 
 
+# The $800015/$800017 pair: a write-then-poll handshake with a peripheral controller, in
+# code the trace never reached (its 1.5% saw none of it). Every read of it on a Mega Drive
+# is the open bus, which answers differently in every emulator and on hardware, and the
+# game then believes a device is there or not depending on noise.
+#
+# Reads become zero, writes become nothing. Zero means "bit 4 clear", which is the game's
+# own "nobody is pulling the line": one handshake path then exits at once with no data, the
+# other spins out its own 256-iteration timeout and takes the error path it was written to
+# take. Both are what the game does when no peripheral answers, and now it is the same
+# answer everywhere.
+HANDSHAKE = {
+    # move.b #imm,$8000xx.l  ->  four nops
+    "13fc00%02x00800015": "4e71" * 4,
+    "13fc00%02x00800017": "4e71" * 4,
+}
+HANDSHAKE_READS = {
+    "103900800015": "7000" + "4e71" * 2,      # move.b $800015.l,d0  -> moveq #0,d0
+    "123900800015": "7200" + "4e71" * 2,      # ... d1
+    "143900800015": "7400" + "4e71" * 2,      # ... d2
+    "0839000400800015": "7000" + "4e71" * 3,  # btst #4,$800015.l -> moveq #0,d0 (Z set)
+}
+
+
+def patch_handshake(rom):
+    """Replace every $800015/$800017 access. Returns how many, by kind."""
+    done = {"writes": 0, "reads": 0}
+    for template in HANDSHAKE:
+        for imm in range(256):
+            want = bytes.fromhex(template % imm)
+            at = 0
+            while True:
+                at = rom.find(want, at)
+                if at < 0:
+                    break
+                rom[at:at + len(want)] = bytes.fromhex(HANDSHAKE[template])
+                done["writes"] += 1
+                at += len(want)
+    for want_hex, repl_hex in HANDSHAKE_READS.items():
+        want, repl = bytes.fromhex(want_hex), bytes.fromhex(repl_hex)
+        assert len(want) == len(repl)
+        at = 0
+        while True:
+            at = rom.find(want, at)
+            if at < 0:
+                break
+            rom[at:at + len(repl)] = repl
+            done["reads"] += 1
+            at += len(repl)
+    return done
+
+
 def pad_stub():
     """Read the Mega Drive pad and leave a Pico-shaped byte where the Pico read used to land.
 
@@ -304,6 +355,8 @@ def main(argv):
         expect(rom, at, want, "Pico I/O site $%06X" % at)
         rom[at:at + len(repl)] = repl
 
+    handshake = patch_handshake(rom)
+
     # 2b. The pad stub the site above jumps to.
     pad, pad_parts = pad_stub()
     expect(rom, PAD_STUB_AT, b"\xFF" * len(pad), "free space for the pad stub")
@@ -340,6 +393,8 @@ def main(argv):
     print("pad stub         : $%06X, %d bytes (D-pad, Start = red, B = tap,\n"
           "                   A+D-pad = cursor, C+Left/Right = page)" % (PAD_STUB_AT, len(pad)))
     print("Pico I/O         : %d sites neutralised, no $8000xx access left" % len(IO_SITES))
+    print("handshake        : $800015/$800017, %d writes and %d reads silenced"
+          % (handshake["writes"], handshake["reads"]))
     print("still missing    : pen coordinates (a pad cannot point)")
     print("wrote %s (%d bytes)" % (argv[2], len(rom)))
 
