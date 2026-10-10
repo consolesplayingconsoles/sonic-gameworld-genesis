@@ -24,6 +24,7 @@ of being written in the abstract, and so what breaks is written down.
 | audio | out of scope |
 | in Genesis Plus GX and PicoDrive | boots to the title screen and first menu |
 | in BlastEm (accuracy core) | runs, zero unmapped accesses |
+| in OpenEmu | boots: the core that matched the console all along |
 | tested on hardware | black until now: an unmapped write stalled the 68000 at the first instruction. Retest pending |
 
 The pad works: D-pad, B as the Pico's red button, Start standing in for the
