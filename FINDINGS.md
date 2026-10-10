@@ -208,6 +208,34 @@ after the game's own inversion:
 | B | `1000` | bit 4, the red button |
 | Start | `8000` | bit 7, the pen |
 
+## The Z80, which is why hardware was black
+
+Real hardware showed the same black screen as OpenEmu, which settles the
+earlier open question: OpenEmu was right and the two cores that ran it are the
+lenient ones.
+
+This ROM never touches the Z80. No Pico game does: a Pico has no Z80, no
+`$A11100`, no `$A11200`. A Mega Drive powers its Z80 up **running**, with RAM
+holding whatever the last power-on left, and the Z80 reaches the 68000 bus
+through its bank window, VDP ports included. An emulator zeroes that RAM, so
+the Z80 executes NOPs and nothing shows; hardware executes garbage and
+scribbles over the display.
+
+The boot stub now takes the bus and holds the Z80 in reset before anything
+else, which costs nothing here: the ADPCM chip it would have driven does not
+exist on a Mega Drive either.
+
+```
+07F800  move.w  #$100, $a11100.l    take the bus from the Z80
+07F808  move.w  #$0, $a11200.l      and hold it in reset
+07F810  move.b  $a10001.l, d0       TMSS present?
+...
+```
+
+**The lesson for any conversion: an emulator is not evidence about boot-time
+hardware state.** Zeroed RAM, a silent Z80 and a forgiving bus are all things a
+real console does not give you.
+
 ## OpenEmu: unexplained, not fixed
 
 OpenEmu showed a black screen on every build tried, including one with no
@@ -227,6 +255,7 @@ you press Play on is the thing these findings were measured in.
 
 | | |
 |---|---|
+| Z80 | bus taken and held in reset at boot, before anything draws |
 | Pico I/O | all ten sites neutralised: no `$8000xx` access left |
 | TMSS | unlocked at reset, guarded by the `$A10001` version check |
 | header `$190` / `$1F0` | joypad declared, region `JUE` instead of `4` |

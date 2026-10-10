@@ -10,7 +10,6 @@ set -a; . "$HERE/.env"; set +a
 
 : "${PICO_ROM:?[ERROR] PICO_ROM is empty: point it at the Pico dump to patch}"
 [ -f "$PICO_ROM" ] || { echo "[ERROR] PICO_ROM does not exist: $PICO_ROM"; exit 1; }
-PAGE="${PAGE:-0}"
 
 BUILD="$HERE/build"; mkdir -p "$BUILD" "$HERE/rom"
 
@@ -26,7 +25,7 @@ case "$PICO_ROM" in
     ;;
 esac
 
-python3 "$HERE/patch.py" "$SRC" "$BUILD/patched.bin" --page "$PAGE"
+python3 "$HERE/patch.py" "$SRC" "$BUILD/patched.bin"
 
 # The ROM is named by the project naming convention (pluto/api/rom_name.py), the same
 # name it is published and sent under, so it is never renamed on the way.
@@ -37,5 +36,5 @@ cp "$BUILD/patched.bin" "$ROM"
 # The release artifact is the patch, next to the ROM but shipped on its own.
 python3 "$HERE/ips.py" "$SRC" "$ROM" "${ROM%.bin}.ips"
 
-echo "built: $ROM ($(wc -c < "$ROM") bytes), page $PAGE"
+echo "built: $ROM ($(wc -c < "$ROM") bytes)"
 echo "##OUTPUT:$ROM"

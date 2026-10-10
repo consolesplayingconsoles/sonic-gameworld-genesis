@@ -19,11 +19,11 @@ of being written in the abstract, and so what breaks is written down.
 | | |
 |---|---|
 | Pico I/O registers found | 5, across 11 sites |
-| patched | all Pico I/O, TMSS unlock, page sensor, console string, header |
+| patched | Z80 silenced, all Pico I/O, TMSS unlock, page sensor, console string, header |
 | not patched | pen coordinates (a pad cannot point) |
 | audio | out of scope |
 | in Genesis Plus GX and PicoDrive | boots to the title screen and first menu |
-| tested on hardware | black screen, cause not yet found |
+| tested on hardware | black screen; the Z80 was never silenced, now fixed, retest pending |
 
 The pad works: D-pad, B as the Pico's red button, Start standing in for the
 pen. What it cannot do is point, because the pen is an absolute coordinate and
@@ -34,15 +34,25 @@ measurements behind every claim here.
 ## Build
 
 ```
-cp .env.sample .env     # fill PICO_ROM, pick PAGE 0-5
+cp .env.sample .env     # fill PICO_ROM
 ./build.sh
 ```
 
 Writes `rom/` (gitignored) and an `.ips` beside it.
 
-The page matters: there is no page sensor on a Mega Drive, and on this game the
-physical page *is* the mode selector, so one build reaches one page's activity.
-Six builds reach six.
+## Controls
+
+| pad | Pico |
+|---|---|
+| D-pad | the Pico's D-pad |
+| Start | the red button (red for red) |
+| B | pen tap |
+| A held + D-pad | moves the pen cursor (the cursor itself is not built yet) |
+| C held + Left/Right | turns the storybook page, wrapping through closed |
+
+There is no page sensor on a Mega Drive, and on this game the page *is* the
+mode selector, so turning it from the pad is what makes more than one of its
+activities reachable from a single build.
 
 ## License
 

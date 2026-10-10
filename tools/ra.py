@@ -60,8 +60,7 @@ def cmd(text, reply=True, timeout=1.0):
         s.close()
 
 
-def read(addr, n):
-    """Bytes at a 68000 address: the core's memory map first, then work RAM by offset."""
+def _raw(addr, n):
     for _ in range(3):                            # a busy machine drops or delays answers
         for name, a in (('READ_CORE_MEMORY', addr), ('READ_CORE_RAM', addr - WORK_RAM)):
             r = cmd('%s %x %d' % (name, a, n))
@@ -70,7 +69,26 @@ def read(addr, n):
     sys.exit('read failed at %06X (is RetroArch running with the ROM?)' % addr)
 
 
+def read(addr, n):
+    """Bytes at a 68000 address, in the order the 68000 sees them.
+
+    Genesis Plus GX holds work RAM byte-swapped (it is a 16-bit bus), and exposes it that
+    way, so a read of $FFFB00 hands back the byte the game put at $FFFB01. Reading an even
+    address and swapping each pair back costs nothing and stops every reading being a trap.
+    """
+    if addr < WORK_RAM:
+        return _raw(addr, n)
+    lo = addr & ~1
+    pad = addr - lo
+    size = (pad + n + 1) & ~1
+    data = bytearray(_raw(lo, size))
+    for i in range(0, len(data) - 1, 2):
+        data[i], data[i + 1] = data[i + 1], data[i]
+    return bytes(data[pad:pad + n])
+
+
 def write(addr, data):
+    # Writes go through unswapped: use them on even-length, even-aligned data only.
     hexes = ' '.join('%02x' % b for b in data)
     r = cmd('WRITE_CORE_MEMORY %x %s' % (addr, hexes))
     if r is None or r.split()[2:3] == ['-1']:
