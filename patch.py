@@ -31,6 +31,11 @@ PAGE_STUB_AT = 0x07FA00
 # Free work RAM, found by watching it stay zero through boot, menu and input.
 PAGE_VAR = 0xFB00          # absolute short: $FFFB00. The page, 0 = closed, 1-6 = a page.
 PREV_VAR = 0xFB01          # last frame's page buttons, so a hold is not a repeat
+CURSOR_READY = 0xFB11      # RAM boots cleared, so the cursor centres itself once
+CURSOR_X = 0xFB12          # where the pen is, 0 to 320
+CURSOR_Y = 0xFB14          # 0 to 223
+PEN_X = 0xFB16             # what the game reads instead of $800005: cursor + $3C
+PEN_Y = 0xFB18             # ... instead of $800009: cursor + $1FC
 
 # move.b $80000d.l, d0  -- the page sensor read, 6 bytes at this address.
 PAGE_SITE = 0x00038E
@@ -80,10 +85,12 @@ IO_SITES = [
     # X to $3C-$15F, so $8000 says the pen is up and costs nothing else. Without this the
     # game reads the open bus: a different answer in every emulator and on hardware, and
     # the cursor goes wherever that noise says.
-    (0x000664, "01080000", "303c8000"),
+    (0x000664, "01080000", "3038fb16"),
     # Pen Y, the second half of the same routine: movep.w $4(a0),d1 reads $800009/$80000B
-    # through the same a0. Found by BlastEm reporting the read, not by any scan.
-    (0x00068C, "03080004", "323c8000"),
+    # through the same a0. Found by BlastEm reporting the read, not by any scan. Both halves
+    # now load the cursor the pad stub keeps, in the raw form the game expects: it subtracts
+    # $3C from X and $1FC from Y, and treats bit 15 as "pen not down".
+    (0x00068C, "03080004", "3238fb18"),
 ]
 
 
@@ -237,9 +244,15 @@ def pad_stub():
         ("test Right", "08000003"),                 # noLeft:
         (">noRight", None),
         ("hold Right", "08c20005"),
+        ("test Up", "08000000"),                    # noRight:
+        (">noUp", None),
+        ("hold Up", "08c20006"),
+        ("test Down", "08000001"),                  # noUp:
+        (">noDown", None),
+        ("hold Down", "08c20007"),
 
         # The Pico byte: directions as they came, everything else said explicitly.
-        ("mask", "000000f0"),                       # ori.b #$F0,d0   (noRight:)
+        ("mask", "000000f0"),                       # ori.b #$F0,d0   (noDown:)
         ("test red", "08020003"),                   # Start -> red
         ("=noRed", None),
         ("set red", "08800004"),                    # bclr #4,d0
@@ -274,19 +287,79 @@ def pad_stub():
         ("!noBack", None),                          # bcc: no borrow
         ("page wrap back", "7806"),
         ("store page", "11c4fb00"),                 # noBack:
-        ("restore", "4cdf001f"),                    # nopage: movem.l (a7)+,d0-d4
+
+        # The pen cursor. RAM boots cleared, so the first frame centres it; a raw value of
+        # zero would otherwise read as the pen pressed against the left edge.
+        ("cursor ready?", "4a38fb11"),              # nopage: tst.b $FB11.w, the cursor
+        (">haveCursor", None),
+        ("mark ready", "11fc0001fb11"),
+        ("centre x", "31fc00a0fb12"),
+        ("centre y", "31fc0070fb14"),
+        ("cursor held?", "08020002"),               # haveCursor: A moves the pen
+        ("=noCursor2", None),
+        ("load x", "3638fb12"),
+        ("load y", "3838fb14"),
+        ("test left2", "08020004"),
+        ("=noLeft2", None),
+        ("x minus", "5543"),
+        ("+noLeft2", None),                         # bpl: still >= 0
+        ("x floor", "7600"),
+        ("test right2", "08020005"),                # noLeft2:
+        ("=noRight2", None),
+        ("x plus", "5443"),
+        ("cmp x max", "0c430140"),
+        ("LnoRight2", None),                        # ble
+        ("x ceil", "363c0140"),
+        ("test up2", "08020006"),                   # noRight2:
+        ("=noUp2", None),
+        ("y minus", "5544"),
+        ("+noUp2", None),
+        ("y floor", "7800"),
+        ("test down2", "08020007"),                 # noUp2:
+        ("=noDown2", None),
+        ("y plus", "5444"),
+        ("cmp y max", "0c4400df"),
+        ("LnoDown2", None),
+        ("y ceil", "383c00df"),
+        ("store x", "31c3fb12"),                    # noDown2:
+        ("store y", "31c4fb14"),
+
+        # What the game will read: the cursor in the raw form it decodes, with bit 15 set
+        # unless B is held, which is the pen touching the tablet.
+        ("raw x", "3638fb12"),                      # noCursor2:
+        ("raw x offset", "0643003c"),
+        ("raw y", "3838fb14"),
+        ("raw y offset", "064401fc"),
+        ("pen down?", "08020001"),                  # B
+        (">penDown", None),                         # bne: held, leave bit 15 clear
+        ("x pen up", "00438000"),
+        ("y pen up", "00448000"),
+        ("store pen x", "31c3fb16"),                # penDown:
+        ("store pen y", "31c4fb18"),
+        ("restore", "4cdf001f"),                    # movem.l (a7)+,d0-d4
         ("return", "4e75"),
     ]
     # A branch's name starts with its condition; its target is the instruction after the
     # block it skips, found from the layout rather than written by hand.
-    COND = {">": 0x66, "=": 0x67, "<": 0x65, "!": 0x64}   # bne, beq, bcs, bcc
+    # One symbol per condition, never reused: > bne, = beq, < bcs, ! bcc, + bpl, L ble.
+    COND = {">": 0x66, "=": 0x67, "<": 0x65, "!": 0x64, "+": 0x6A, "L": 0x6F}
     TARGET = {
         ">noC": "test B", ">noB": "test A", ">noA": "test Start", ">noStart": "test Left",
-        ">noLeft": "test Right", ">noRight": "mask",
+        ">noLeft": "test Right", ">noRight": "test Up", ">noUp": "test Down",
+        ">noDown": "mask",
         "=noRed": "test tap", "=noTap": "test cursor", "=noCursor": "test pageheld",
-        "=noPageDirs": "store pad", "=nopage": "restore",
+        "=noPageDirs": "store pad",
+        # the cursor runs whether or not C is held, so skipping the pages lands on it
+        "=nopage": "cursor ready?",
         "=noFwd": "test back", "<noFwd": "test back",
         "=noBack": "store page", "!noBack": "store page",
+        ">haveCursor": "cursor held?",
+        "=noCursor2": "raw x",
+        "=noLeft2": "test right2", "+noLeft2": "test right2",
+        "=noRight2": "test up2", "LnoRight2": "test up2",
+        "=noUp2": "test down2", "+noUp2": "test down2",
+        "=noDown2": "store x", "LnoDown2": "store x",
+        ">penDown": "store pen x",
     }
     parts = [(n, None if h is None else bytes.fromhex(h)) for n, h in P]
     names = [n for n, _ in parts]
@@ -410,7 +483,7 @@ def main(argv):
     print("Pico I/O         : %d sites neutralised, no $8000xx access left" % len(IO_SITES))
     print("handshake        : $800015/$800017, %d writes and %d reads silenced"
           % (handshake["writes"], handshake["reads"]))
-    print("still missing    : pen coordinates (a pad cannot point)")
+    print("pen              : a cursor in RAM, A held + D-pad moves it, B taps")
     print("wrote %s (%d bytes)" % (argv[2], len(rom)))
 
 

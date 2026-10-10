@@ -366,6 +366,37 @@ hardware proved it right about this ROM while two lenient cores ran it happily,
 so Play failing there is the early warning that the cartridge would be black.
 The RetroArch entry stays configured for when you want the lenient view.
 
+## The pen cursor
+
+The game decodes the pen like this, which is the whole contract a substitute
+has to meet:
+
+| | raw word | the game computes | clamped to |
+|---|---|---|---|
+| X | `$800005`/`$800007` | `raw - $3C` | 0 to `$15F` |
+| Y | `$800009`/`$800B` | `raw - $1FC` | 0 to `$1FF` |
+
+and bit 15 set means the pen is not down, in which case it returns `$FFFF` and
+the caller ignores the coordinates.
+
+So the cursor lives in RAM and the two read sites just load it. Both are
+`movep.w`, four bytes, and `move.w $FB16.w,d0` is also four, so the sites need
+no stub at all:
+
+```
+000664  move.w  $fb16.w, d0     was movep.w $0(a0),d0
+00068C  move.w  $fb18.w, d1     was movep.w $4(a0),d1
+```
+
+The pad stub keeps `$FFFB12`/`$FFFB14` as the cursor and writes `$FFFB16`/
+`$FFFB18` as the raw form the game expects, adding the offsets back and setting
+bit 15 whenever B is not held. **A held + D-pad** moves it two pixels a frame,
+clamped to 0-320 and 0-223, and the directions are withheld from the game while
+A is down so one press does not both move the cursor and walk a menu.
+
+RAM boots cleared, and a raw zero would read as the pen pressed against the top
+left corner, so the first frame centres the cursor and sets a flag byte.
+
 ## What `patch.py` does today
 
 | | |

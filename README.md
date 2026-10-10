@@ -18,7 +18,7 @@ instead.
 |---|---|
 | Pico I/O registers found | 5, across 11 sites |
 | patched | Z80 silenced, all Pico I/O including the $800015 handshake, TMSS unlock, page sensor, console string, header |
-| not patched | pen coordinates (a pad cannot point) |
+| not patched | nothing known |
 | audio | out of scope |
 | in Genesis Plus GX and PicoDrive | boots to the title screen and first menu |
 | in BlastEm (accuracy core) | runs, zero unmapped accesses |
@@ -47,7 +47,7 @@ Writes `rom/` (gitignored) and an `.ips` beside it.
 | D-pad | the Pico's D-pad |
 | Start | the red button (red for red) |
 | B | pen tap |
-| A held + D-pad | moves the pen cursor (the cursor itself is not built yet) |
+| A held + D-pad | moves the pen cursor, 2 pixels a frame, clamped to the tablet |
 | C held + Left/Right | turns the storybook page, wrapping through closed |
 
 There is no page sensor on a Mega Drive, and on this game the page *is* the
