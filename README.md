@@ -1,18 +1,16 @@
 # sonic-gameworld-genesis
 
-**A port of Sonic The Hedgehog's Gameworld (Sega Pico, 1994) to the Sega Mega
-Drive / Genesis.** It is a game, not a tool: you end up playing a Pico title on
-a Mega Drive, with a normal controller in your hands.
+**Sonic The Hedgehog's Gameworld** (Sega Pico, 1994), ported to the Sega Mega
+Drive / Genesis and played with a normal controller.
 
-The Pico was a children's console shaped like a storybook, with a pen on a
-drawing tablet, a page sensor under the book, one red button and a D-pad. Its
-ROMs are already Mega Drive code (same 68000, same VDP, same header slot), so
-porting one is not a recompile. It is a substitution: every place the game
-talks to hardware the Mega Drive does not have, answered by something it does.
+The Pico was a children's console shaped like a storybook: a pen on a drawing
+tablet, a sensor reading which page is open, one red button and a D-pad. Its
+ROMs are already Mega Drive code, same 68000, same VDP, same header slot, so
+the port is not a recompile. It is a substitution: everywhere the game reaches
+for hardware a Mega Drive does not have, something it does have answers
+instead.
 
-The patcher in this repo (`patch.py`) is how the port is produced, not the
-point of it. **It ships a patch, never a ROM**, so you bring your own dump of
-the original.
+**It ships a patch, never a ROM.** You bring your own dump of the original.
 
 ## State
 
