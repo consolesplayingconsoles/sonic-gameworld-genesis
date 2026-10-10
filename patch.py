@@ -63,12 +63,27 @@ IO_SITES = [
     # The FIFO count read through a1 ($800010). Zero makes the `beq` below it taken, which
     # skips the dbra loop that streams sample words into the same dead address.
     (0x06D202, "3011", "7000"),
+    # The boot's own 'SEGA' handshake. Every Mega Drive game writes it to TMSS at
+    # $A14000 through `movep.l d0,$0(a2)`; this build has the identical boot code with the
+    # pointer aimed at the Pico's $800019 instead. On a Mega Drive that address answers
+    # nothing: the 68000 waits for a /DTACK that never comes and stops, at the game's very
+    # first instruction, which is the black screen. BlastEm reports it as "Unmapped byte
+    # write to 800019" and halts in the same place.
+    #
+    # Aiming it at $A14000 is not the answer either: a console without TMSS has nothing
+    # there, and writing to it is the same unmapped stall. The handshake has no meaning on
+    # a Mega Drive at all, so it goes to scratch RAM, where the four bytes land harmlessly,
+    # and the TMSS unlock stays in the boot stub where it is guarded by the version check.
+    (0x00027C, "00800019", "00fffb10"),
     # The pen, read through a0 ($800005) by movep, which is why no scan of absolute
     # addresses ever saw it. The game tests bit 15 for "pen not down" and otherwise clamps
     # X to $3C-$15F, so $8000 says the pen is up and costs nothing else. Without this the
     # game reads the open bus: a different answer in every emulator and on hardware, and
     # the cursor goes wherever that noise says.
     (0x000664, "01080000", "303c8000"),
+    # Pen Y, the second half of the same routine: movep.w $4(a0),d1 reads $800009/$80000B
+    # through the same a0. Found by BlastEm reporting the read, not by any scan.
+    (0x00068C, "03080004", "323c8000"),
 ]
 
 

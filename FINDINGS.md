@@ -281,6 +281,44 @@ is why the TMSS unlock genuinely has to be added, and it is also why RAM noise
 is not a suspect: the game clears all of it. Register 1 is `$14` at boot
 (display off), enabled later through the shadow at `$FFF804`.
 
+## The actual cause: an unmapped WRITE stalls the 68000
+
+Every fix before this was a guess, because the failure was never reproduced on
+this machine. BlastEm reproduces it and names it in one line:
+
+```
+[libretro ERROR] Unmapped byte write to 800019
+```
+
+That is the game's own boot, `movep.l d0,$0(a2)` with `a2 = $800019`, the
+`'SEGA'` handshake. A **read** of absent hardware returns the open bus and the
+machine carries on. A **write** to an address nothing answers leaves the 68000
+waiting for a /DTACK that never comes, and it stops there: at the game's first
+instruction, before anything draws. That is the black screen, and it is why
+Genesis Plus GX and PicoDrive run the ROM happily while the console does not.
+
+`$A14000` is not the answer either: a console without TMSS has nothing there,
+and BlastEm halts on that too. The handshake has no meaning on a Mega Drive at
+all, so it now writes into scratch RAM, and the TMSS unlock stays in the boot
+stub where the version check guards it.
+
+BlastEm then reported one more, a read this time, which found the pen's **Y**
+half: `movep.w $4(a0),d1` through the same `a0`, reading `$800009`/`$80000B`.
+No scan had found it, because the instruction names only `a0`.
+
+The build is now clean: **zero unmapped accesses**, and BlastEm runs it to the
+title screen.
+
+### How to do this the first time instead of the tenth
+
+Use an accuracy-focused core before a lenient one. `blastem_libretro` reports
+every unmapped access and halts where the hardware stalls, which turns "black
+screen" into an address and a line of code. Genesis Plus GX and PicoDrive are
+for seeing the game once it runs, not for finding out why it does not.
+
+Control first: confirm the strict core runs a known-good ROM of that system, so
+an exit means something.
+
 ## The Z80, which is why hardware was black
 
 Real hardware showed the same black screen as OpenEmu, which settles the
@@ -306,8 +344,9 @@ exist on a Mega Drive either.
 ...
 ```
 
-**The lesson for any conversion: an emulator is not evidence about boot-time
-hardware state.** Zeroed RAM, a silent Z80 and a forgiving bus are all things a
+(This was a real defect, though not the black screen: that was the unmapped
+write above.) **The lesson for any conversion: an emulator is not evidence
+about boot-time hardware state.** Zeroed RAM, a silent Z80 and a forgiving bus are all things a
 real console does not give you.
 
 ## OpenEmu: unexplained, not fixed

@@ -23,7 +23,8 @@ of being written in the abstract, and so what breaks is written down.
 | not patched | pen coordinates (a pad cannot point) |
 | audio | out of scope |
 | in Genesis Plus GX and PicoDrive | boots to the title screen and first menu |
-| tested on hardware | black screen; the Z80 was never silenced, now fixed, retest pending |
+| in BlastEm (accuracy core) | runs, zero unmapped accesses |
+| tested on hardware | black until now: an unmapped write stalled the 68000 at the first instruction. Retest pending |
 
 The pad works: D-pad, B as the Pico's red button, Start standing in for the
 pen. What it cannot do is point, because the pen is an absolute coordinate and
