@@ -2,3 +2,4 @@ build/
 rom/
 .env
 .DS_Store
+.retroarch.pid

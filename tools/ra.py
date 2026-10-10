@@ -3,7 +3,8 @@
 network commands over UDP 55355 (memory, pause, frame step, screenshot) and its network
 gamepad on 55400 (player 1). Stdlib only.
 
-    ra.py launch [rom]      start RetroArch with the Genesis core and the built ROM
+    ra.py launch [rom]      start this port's own RetroArch (its own ports and pid)
+    ra.py stop              quit that one, and only that one
     ra.py status            RetroArch's state (playing/paused, content)
     ra.py read ADDR [N]     N bytes (default 4) at a 68000 address, e.g. FFF80A
     ra.py word ADDR         one big-endian 16-bit value
@@ -31,11 +32,17 @@ import sys
 import time
 
 HOST = '127.0.0.1'
-CMD_PORT = 55355
-PAD_PORT = 55400                                  # network_remote_base_port + user 0
+# This port's own ports and its own RetroArch process. Another session drives the default
+# 55355/55400 (the Crazy Taxi sandbox), and sharing them means stealing its instance.
+CMD_PORT = 55357
+PAD_PORT = 55500                                  # network_remote_base_port + user 0
+CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'retroarch-port.cfg')
+PIDFILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.retroarch.pid')
 RA = '/Applications/RetroArch.app'
+# BlastEm by default: it reports unmapped accesses and halts where hardware stalls, which
+# is what found this port's black screen. Genesis Plus GX runs ROMs a console refuses.
 CORE = os.path.expanduser('~/Library/Application Support/RetroArch/cores/'
-                          'genesis_plus_gx_libretro.dylib')
+                          'blastem_libretro.dylib')
 SHOTS = os.path.expanduser('~/Documents/RetroArch/screenshots')
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROM_DIR = os.path.join(HERE, '..', 'rom')
@@ -105,13 +112,34 @@ def button(name, down):
     pad(JOYPAD, 0, PAD[name.upper()], 1 if down else 0)
 
 
+def stop():
+    """Quit only the RetroArch this script started, never anyone else's."""
+    try:
+        pid = int(open(PIDFILE).read().strip())
+    except Exception:
+        return
+    try:
+        os.kill(pid, 15)
+    except OSError:
+        pass
+    try:
+        os.unlink(PIDFILE)
+    except OSError:
+        pass
+
+
 def launch(rom=None):
     if rom is None:
         found = sorted(glob.glob(os.path.join(glob.escape(ROM_DIR), '*.bin')))
         if not found:
             sys.exit('no ROM in %s: build it from Pluto first' % ROM_DIR)
         rom = found[0]
-    subprocess.check_call(['open', '-g', '-n', '-a', RA, '--args', '-L', CORE, rom])
+    stop()                                        # only ours, by pid
+    time.sleep(1)
+    binary = os.path.join(RA, 'Contents', 'MacOS', 'RetroArch')
+    proc = subprocess.Popen([binary, '--appendconfig', CONFIG, '-L', CORE, rom],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    open(PIDFILE, 'w').write(str(proc.pid))
     for _ in range(60):
         time.sleep(1)
         r = cmd('GET_STATUS')
@@ -160,6 +188,8 @@ def main(a):
     c = a[0]
     if c == 'launch':
         launch(a[1] if len(a) > 1 else None)
+    elif c == 'stop':
+        stop()
     elif c == 'status':
         print(cmd('GET_STATUS'))
     elif c == 'read':
