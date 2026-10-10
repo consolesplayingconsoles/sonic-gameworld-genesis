@@ -208,11 +208,52 @@ after the game's own inversion:
 | B | `1000` | bit 4, the red button |
 | Start | `8000` | bit 7, the pen |
 
+## What a scan of absolute addresses cannot see
+
+Two Pico accesses in this game never name their address: they load it into a
+register first. A dataref scan, and therefore everything built on one, is blind
+to both.
+
+```
+00065E  movea.l #$800005, a0      the pen
+000664  movep.w $0(a0), d0        <- the read itself names only a0
+06D1EA  lea.l   $800010.l, a1     the sound FIFO
+```
+
+The pen matters: this game **does** read it, which contradicts the earlier note
+here that it never did. Unpatched it reads the open bus, which answers
+differently in every emulator and on hardware, and the game clamps whatever it
+gets to X `$3C`-`$15F` and puts the cursor there. It now returns `$8000`, bit
+15 set, which is the game's own "pen not down".
+
+So the rule is: after neutralising what the scan finds, search for
+**instructions that load a Pico address into a register** (`lea`, `movea.l
+#imm`). In this ROM that is exactly two places, and both needed patching.
+
+## The game's own boot is the standard Sega one
+
+Worth knowing before patching any of it:
+
+```
+000210  lea     $276(pc), a5         a table of three pointers
+00021C  move.l  #'SEGA', d0
+000222  movep.l d0, $0(a2)           a2 = $800019 here, $A14000 on a Mega Drive
+00023E  move.l  d0, -(a6)            clears all 64 KB of work RAM
+000230  move.b  (a5)+, d5 / move.w d5, (a4)    all 24 VDP registers
+```
+
+It is the same boot every Mega Drive game ships, with one substitution: the
+`'SEGA'` write goes to the Pico's `$800019` instead of TMSS's `$A14000`. That
+is why the TMSS unlock genuinely has to be added, and it is also why RAM noise
+is not a suspect: the game clears all of it. Register 1 is `$14` at boot
+(display off), enabled later through the shadow at `$FFF804`.
+
 ## The Z80, which is why hardware was black
 
 Real hardware showed the same black screen as OpenEmu, which settles the
 earlier open question: OpenEmu was right and the two cores that ran it are the
-lenient ones.
+lenient ones. (The build tested did not yet contain this fix: it is still
+unverified on hardware.)
 
 This ROM never touches the Z80. No Pico game does: a Pico has no Z80, no
 `$A11100`, no `$A11200`. A Mega Drive powers its Z80 up **running**, with RAM

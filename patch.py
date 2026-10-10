@@ -63,6 +63,12 @@ IO_SITES = [
     # The FIFO count read through a1 ($800010). Zero makes the `beq` below it taken, which
     # skips the dbra loop that streams sample words into the same dead address.
     (0x06D202, "3011", "7000"),
+    # The pen, read through a0 ($800005) by movep, which is why no scan of absolute
+    # addresses ever saw it. The game tests bit 15 for "pen not down" and otherwise clamps
+    # X to $3C-$15F, so $8000 says the pen is up and costs nothing else. Without this the
+    # game reads the open bus: a different answer in every emulator and on hardware, and
+    # the cursor goes wherever that noise says.
+    (0x000664, "01080000", "303c8000"),
 ]
 
 
