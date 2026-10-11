@@ -1,0 +1,20 @@
+controls.svg embeds two photographs, both used under their own licences:
+
+  Sega Pico
+    File:    Kids Computer Pico-01.jpg
+    Author:  Muband (ja.wikipedia)
+    Source:  https://commons.wikimedia.org/wiki/File:Kids_Computer_Pico-01.jpg
+    Licence: CC BY-SA 3.0  (https://creativecommons.org/licenses/by-sa/3.0/)
+
+  Mega Drive / Genesis control pad
+    File:    Genesis controller.png
+    Author:  Joel Trottier
+    Source:  https://commons.wikimedia.org/wiki/File:Genesis_controller.png
+    Licence: public domain (PD-self)
+
+Changes: both embedded at their original resolution, with callout lines and
+labels added around them.
+
+Because the Pico photo is CC BY-SA 3.0, the diagram as a whole carries that
+licence, as share-alike requires. Everything else in this repository is
+GPL-3.0-or-later (see LICENSE).
