@@ -40,6 +40,8 @@ cp .env.sample .env     # fill PICO_ROM
 
 Writes `rom/` (gitignored) and an `.ips` beside it.
 
+![Control map](images/controls.svg)
+
 ## Controls
 
 | pad | Pico |
@@ -59,6 +61,35 @@ there.
 There is no page sensor on a Mega Drive, and on this game the page *is* the
 mode selector, so turning it from the pad is what makes more than one of its
 activities reachable from a single build.
+
+## The storyware pages
+
+The page sensor is the game's mode selector, so each page is a different set of
+minigames. **The US and Japanese releases are not the same game**: Sega cut the
+gambling, fortune-telling and rock-paper-scissors content for North America,
+which removed the Japanese third page, moved the remaining games around, and
+put a drawing page in its place. So "it is a drawing game" is one page of the
+US dump.
+
+* [StrategyWiki](https://strategywiki.org/wiki/Sonic_the_Hedgehog%27s_Gameworld), zones and the US/JP differences
+* [Sega Retro](https://www.segaretro.org/Sonic%27s_Gameworld)
+* [DJCUBE's review](https://djcube.co.uk/sonic-the-hedgehogs-gameworld/), the only page-by-page list of the minigames
+
+## Both dumps
+
+The patcher finds its sites by **signature**, not by address, so it converts
+the Japanese build as well as the USA one. Same code, different addresses:
+
+| | USA | Japan |
+|---|---|---|
+| pad read | `$0003FE` | `$0003F8` |
+| pen X / Y | `$000664` / `$00068C` | `$000584` / `$0005B2` |
+| sound status | `$06D1D4` | `$0690F6` |
+| stubs land in filler at | `$0617C6` | `$0194BA` |
+
+Even the stub placement is found per ROM: the USA build's 43 KB of `$FF` near
+the end is artwork in the Japanese one. The handshake and sound modules are
+byte-identical between the two, which is why both report the same counts.
 
 ## License
 

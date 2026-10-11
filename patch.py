@@ -24,9 +24,6 @@ RESET_VECTOR = 0x004
 
 # Where the TMSS stub goes: inside the existing $FF filler near the end of the ROM, so
 # nothing moves and the ROM does not grow. Checked before it is written.
-STUB_AT = 0x07F800
-PAD_STUB_AT = 0x07F850
-PAGE_STUB_AT = 0x07FA00
 
 # Free work RAM, found by watching it stay zero through boot, menu and input.
 PAGE_VAR = 0xFB00          # absolute short: $FFFB00. The page, 0 = closed, 1-6 = a page.
@@ -39,8 +36,7 @@ PEN_X = 0xFB16             # what the game reads instead of $800005: cursor + $3
 PEN_Y = 0xFB18             # ... instead of $800009: cursor + $1FC
 MODE_VAR = 0xFB1B          # 0 = the D-pad moves the hand, 1 = it reaches the game
 
-# move.b $80000d.l, d0  -- the page sensor read, 6 bytes at this address.
-PAGE_SITE = 0x00038E
+# move.b $80000d.l, d0  -- the page sensor read, found by its bytes.
 PAGE_READ = bytes.fromhex("10390080000d")
 NOP = bytes.fromhex("4e71")
 
@@ -50,49 +46,43 @@ NOP = bytes.fromhex("4e71")
 #
 # (site, what must be there, what replaces it). Same length every time.
 IO_SITES = [
+    # (what it is, the bytes to find, what replaces them, an anchor when the pattern alone
+    # would be ambiguous). Located by signature: the Japanese build is the same code at
+    # different addresses, so anything pinned to an address converts one dump only.
+    #
     # The pad: read the Mega Drive controller instead (see pad_stub). 8 bytes becomes a
-    # 6-byte jsr and a nop. The address is built from PAD_STUB_AT below, never written
-    # here: a hardcoded one survived moving the stub and sent the game into the middle
-    # of another one.
-    (0x0003FE, "11f900800003f80b", None),
+    # 6-byte jsr and a nop; the address is filled in once the stub has been placed.
+    ("pad read", "11f900800003f80b", None, None),
     # Write-only control: nothing reads it back, so it just goes.
-    (0x000B66, "13c700800017", "4e71" * 3),
-    # Sound command writes: six of them, all stores into a chip that is not there.
-    (0x06D1C8, "33c000800012", "4e71" * 3),
-    (0x06D22A, "33c000800012", "4e71" * 3),
-    (0x06D29E, "33c000800012", "4e71" * 3),
-    (0x06D2BA, "33c000800012", "4e71" * 3),
-    (0x06D2E6, "33fc800000800012", "4e71" * 4),
-    (0x06D2EE, "33fc088000800012", "4e71" * 4),
+    ("control write", "13c700800017", "4e71" * 3, None),
     # The one sound READ of $800012. A Pico answers $80 there (ADPCM control), so N is set
     # and the `bpl` below is NOT taken: moveq #-1 reproduces those flags exactly.
-    (0x06D1D4, "4a3900800012", "70ff" + "4e71" * 2),
+    ("sound status", "4a3900800012", "70ff" + "4e71" * 2, None),
     # The FIFO count read through a1 ($800010). Zero makes the `beq` below it taken, which
-    # skips the dbra loop that streams sample words into the same dead address.
-    (0x06D202, "3011", "7000"),
-    # The boot's own 'SEGA' handshake. Every Mega Drive game writes it to TMSS at
-    # $A14000 through `movep.l d0,$0(a2)`; this build has the identical boot code with the
-    # pointer aimed at the Pico's $800019 instead. On a Mega Drive that address answers
-    # nothing: the 68000 waits for a /DTACK that never comes and stops, at the game's very
-    # first instruction, which is the black screen. BlastEm reports it as "Unmapped byte
-    # write to 800019" and halts in the same place.
-    #
-    # Aiming it at $A14000 is not the answer either: a console without TMSS has nothing
-    # there, and writing to it is the same unmapped stall. The handshake has no meaning on
-    # a Mega Drive at all, so it goes to scratch RAM, where the four bytes land harmlessly,
-    # and the TMSS unlock stays in the boot stub where it is guarded by the version check.
-    (0x00027C, "00800019", "00fffb10"),
-    # The pen, read through a0 ($800005) by movep, which is why no scan of absolute
-    # addresses ever saw it. The game tests bit 15 for "pen not down" and otherwise clamps
-    # X to $3C-$15F, so $8000 says the pen is up and costs nothing else. Without this the
-    # game reads the open bus: a different answer in every emulator and on hardware, and
-    # the cursor goes wherever that noise says.
-    (0x000664, "01080000", "3038fb16"),
-    # Pen Y, the second half of the same routine: movep.w $4(a0),d1 reads $800009/$80000B
-    # through the same a0. Found by BlastEm reporting the read, not by any scan. Both halves
-    # now load the cursor the pad stub keeps, in the raw form the game expects: it subtracts
-    # $3C from X and $1FC from Y, and treats bit 15 as "pen not down".
-    (0x00068C, "03080004", "3238fb18"),
+    # skips the dbra loop that streams sample words into the same dead address. Two bytes
+    # on their own match everywhere, so it is anchored to the lea that sets up a1.
+    ("sound fifo", "3011", "7000", "43f900800010"),
+    # The boot's own 'SEGA' handshake, which a Mega Drive sends to TMSS at $A14000 and a
+    # Pico sends to $800019 through a pointer in a table. On a Mega Drive that address
+    # answers nothing, the 68000 waits for a /DTACK that never comes, and it stops there:
+    # the black screen, at the game's first instruction. $A14000 is no better (a console
+    # without TMSS has nothing there either), so it goes to scratch RAM and the TMSS
+    # unlock stays in the boot stub behind its version check. Anchored on the table's own
+    # d5/d6/d7 words so the pointer is the one in the boot table.
+    ("boot handshake", "00800019", "00fffb10", "80003fff0100"),
+    # The pen, read through a0 by movep, which is why no scan of absolute addresses saw it.
+    # Both halves load the cursor the pad stub keeps, in the raw form the game decodes: it
+    # subtracts $3C from X and $1FC from Y, and treats bit 15 as "pen not on the tablet".
+    ("pen x", "01080000", "3038fb16", ("207c00800005", "41f900800005")),
+    ("pen y", "03080004", "3238fb18", ("207c00800005", "41f900800005")),
+]
+
+# Sound command writes: the same instruction at several sites, all stores into a chip that
+# is not there, so every occurrence goes.
+IO_SWEEPS = [
+    ("sound command", "33c000800012", "4e71" * 3),
+    ("sound command word", "33fc800000800012", "4e71" * 4),
+    ("sound command word 2", "33fc088000800012", "4e71" * 4),
 ]
 
 
@@ -417,6 +407,76 @@ def page_stub():
     return b"".join(b for _, b in parts), parts
 
 
+def free_space(rom, needed):
+    """The start of a run of filler long enough for the stubs, found per ROM.
+
+    The USA build has 43 KB of $FF near the end and the Japanese one has art there, so a
+    hardcoded address writes a stub over a sprite. Take the longest run of a single filler
+    byte, which is what a mastering tool leaves behind, and start on an even address.
+    """
+    best = (0, None)
+    run_val, run_start = None, 0
+    for i, b in enumerate(bytes(rom) + b"\x00"):
+        if b != run_val:
+            if run_val in (0x00, 0xFF) and i - run_start > best[0]:
+                best = (i - run_start, run_start)
+            run_val, run_start = b, i
+    length, at = best
+    at = (at + 1) & ~1 if at is not None else None
+    if at is None or length < needed + 2:
+        sys.exit("[ERROR] no run of filler %d bytes long in this ROM: nowhere to put the "
+                 "stubs." % needed)
+    return at
+
+
+def find_one(rom, pattern, what, after=None, within=256):
+    """Where `pattern` is, found by its bytes rather than by an address.
+
+    Addresses do not survive a different build: the Japanese Gameworld is the same code
+    with the page read six bytes earlier, so every site pinned to a USA address missed.
+    Signatures travel. Each one must match exactly once, or the patch is not sure what it
+    is editing and says so instead of guessing.
+
+    `after` anchors a short pattern that would otherwise be ambiguous: the search starts at
+    that anchor and runs `within` bytes.
+    """
+    start, end = 0, len(rom)
+    if after is not None:
+        # An anchor may have alternatives: the same setup is `movea.l #$800005,a0` in the
+        # USA build and `lea $800005.l,a0` in the Japanese one, which are different bytes
+        # for the same thing.
+        found = [rom.find(a) for a in (after if isinstance(after, tuple) else (after,))]
+        found = [f for f in found if f >= 0]
+        if len(found) != 1:
+            sys.exit("[ERROR] %s anchor: %d of its forms are present, need exactly one.\n"
+                     "        Re-run the I/O scan against this build before patching it."
+                     % (what, len(found)))
+        start, end = found[0], found[0] + within
+    hits, at = [], start
+    while True:
+        at = rom.find(pattern, at, end)
+        if at < 0:
+            break
+        hits.append(at)
+        at += 1
+    if len(hits) != 1:
+        sys.exit("[ERROR] %s: expected one match for %s, found %d.\n"
+                 "        Re-run the I/O scan against this build before patching it."
+                 % (what, pattern.hex(), len(hits)))
+    return hits[0]
+
+
+def find_all(rom, pattern):
+    hits, at = [], 0
+    while True:
+        at = rom.find(pattern, at)
+        if at < 0:
+            break
+        hits.append(at)
+        at += len(pattern)
+    return hits
+
+
 def expect(rom, at, want, what):
     got = rom[at:at + len(want)]
     if got != want:
@@ -440,40 +500,57 @@ def main(argv):
     if b"PICO" not in rom[0x100:0x110]:
         sys.exit("[ERROR] %s is not a Sega Pico ROM (no PICO at $100)." % argv[1])
 
+    # 0. Where the stubs go, which differs per build: the USA ROM's filler is art in the
+    #    Japanese one.
+    pad, pad_parts = pad_stub()
+    pages, page_parts = page_stub()
+    reset_pc = struct.unpack_from(">I", rom, RESET_VECTOR)[0]
+    boot, boot_parts = tmss_stub(reset_pc)
+    base = free_space(rom, len(boot) + len(pad) + len(pages) + 8)
+    boot_at = base
+    pad_at = (boot_at + len(boot) + 1) & ~1
+    page_at_stub = (pad_at + len(pad) + 1) & ~1
+
     # 1. Page sensor. The read is followed by `move.w #$5,d7 / btst d7,d0 /
     #    bne / dbra d7`, which walks bit 5 down to bit 0 and leaves d7 as the
     #    page index when a bit is set. So a byte with bit N set selects page N,
     #    and `moveq #1<<N,d0` replaces the read in 2 bytes plus two nops.
-    expect(rom, PAGE_SITE, PAGE_READ, "page sensor read")
-    rom[PAGE_SITE:PAGE_SITE + 6] = bytes.fromhex("4eb9") + struct.pack(">I", PAGE_STUB_AT)
+    page_at = find_one(rom, PAGE_READ, "page sensor read")
+    rom[page_at:page_at + 6] = bytes.fromhex("4eb9") + struct.pack(">I", page_at_stub)
 
     # 2. Pico I/O: every access replaced, so the ROM touches no absent hardware.
-    for at, want, repl in IO_SITES:
+    located = []
+    for what, want, repl, anchor in IO_SITES:
         if repl is None:                      # the pad site: jsr to wherever the stub is
-            repl = ("4eb9" + "%08x" % PAD_STUB_AT) + "4e71"
+            repl = ("4eb9" + "%08x" % pad_at) + "4e71"
         want, repl = bytes.fromhex(want), bytes.fromhex(repl)
-        assert len(want) == len(repl), "%06X: %d bytes becomes %d" % (at, len(want), len(repl))
-        expect(rom, at, want, "Pico I/O site $%06X" % at)
+        assert len(want) == len(repl), "%s: %d bytes becomes %d" % (what, len(want), len(repl))
+        if anchor is None:
+            anchor_bytes = None
+        elif isinstance(anchor, tuple):
+            anchor_bytes = tuple(bytes.fromhex(a) for a in anchor)
+        else:
+            anchor_bytes = bytes.fromhex(anchor)
+        at = find_one(rom, want, what, anchor_bytes)
         rom[at:at + len(repl)] = repl
+        located.append((what, at))
+    swept = 0
+    for what, want, repl in IO_SWEEPS:
+        want, repl = bytes.fromhex(want), bytes.fromhex(repl)
+        for at in find_all(rom, want):
+            rom[at:at + len(repl)] = repl
+            swept += 1
 
     handshake = patch_handshake(rom)
 
-    # 2b. The pad stub the site above jumps to.
-    pad, pad_parts = pad_stub()
-    expect(rom, PAD_STUB_AT, b"\xFF" * len(pad), "free space for the pad stub")
-    rom[PAD_STUB_AT:PAD_STUB_AT + len(pad)] = pad
+    # 2b. The stubs themselves, into the filler found above.
+    rom[pad_at:pad_at + len(pad)] = pad
 
-    pages, page_parts = page_stub()
-    expect(rom, PAGE_STUB_AT, b"\xFF" * len(pages), "free space for the page stub")
-    rom[PAGE_STUB_AT:PAGE_STUB_AT + len(pages)] = pages
 
-    # 3. TMSS. The stub goes in filler and the reset vector points at it, so the unlock
-    #    runs before anything else and the game's own code is untouched.
-    reset_pc = struct.unpack_from(">I", rom, RESET_VECTOR)[0]
-    code, parts = tmss_stub(reset_pc)
-    expect(rom, STUB_AT, b"\xFF" * len(code), "free space for the TMSS stub")
-    rom[STUB_AT:STUB_AT + len(code)] = code
-    struct.pack_into(">I", rom, RESET_VECTOR, STUB_AT)
+    # 3. Boot stub: Z80 silenced, TMSS unlocked, then the game's own reset.
+    rom[boot_at:boot_at + len(boot)] = boot
+    rom[page_at_stub:page_at_stub + len(pages)] = pages
+    struct.pack_into(">I", rom, RESET_VECTOR, boot_at)
 
     # 4. Header, so a Mega Drive and a flashcart menu accept it.
     rom[0x100:0x110] = CONSOLE
@@ -483,17 +560,16 @@ def main(argv):
 
     open(argv[2], "wb").write(bytes(rom))
     print("page sensor      : answered from RAM, starts closed; C and Start turn it")
-    print("boot stub        : $%06X, %d bytes, reset was $%06X (Z80 silenced, TMSS)"
-          % (STUB_AT, len(code), reset_pc))
-    for name, b in parts:
-        print("                   %-26s %s" % (name, b.hex()))
+    print("stubs            : boot $%06X (%d), pad $%06X (%d), page $%06X (%d); reset was $%06X"
+          % (boot_at, len(boot), pad_at, len(pad), page_at_stub, len(pages), reset_pc))
     print("console string   : %s" % CONSOLE.decode())
     print("I/O support      : %s (joypad)" % IO_SUPPORT.decode().strip())
     print("region           : %s" % REGION.decode().strip())
     print("header checksum  : $%04X" % checksum(rom))
-    print("pad stub         : $%06X, %d bytes (D-pad, Start = red, B = tap,\n"
-          "                   A+D-pad = cursor, C+Left/Right = page)" % (PAD_STUB_AT, len(pad)))
-    print("Pico I/O         : %d sites neutralised, no $8000xx access left" % len(IO_SITES))
+
+    print("Pico I/O         : %d sites found by signature, %d more swept" % (len(located), swept))
+    for what, at in located:
+        print("                   %-16s $%06X" % (what, at))
     print("handshake        : $800015/$800017, %d writes and %d reads silenced"
           % (handshake["writes"], handshake["reads"]))
     print("pen              : always on the tablet, so the hand is always drawn;")

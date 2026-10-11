@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 560" width="980" height="560" font-family="Helvetica, Arial, sans-serif">
+  <style>
+    .bg   { fill: #faf9f7; }
+    .case { fill: #e9e6e1; stroke: #3a3a3a; stroke-width: 2.5; }
+    .ink  { fill: #2b2b2b; }
+    .sub  { fill: #5e5e5e; }
+    .btn  { fill: #d8d4cd; stroke: #3a3a3a; stroke-width: 2; }
+    .lead { stroke: #3a3a3a; stroke-width: 1.6; fill: none; stroke-dasharray: 4 3; }
+    .screenish { fill: #d3dbe2; stroke: #3a3a3a; stroke-width: 2; }
+    .t    { font-size: 15px; }
+    .tb   { font-size: 15px; font-weight: 700; }
+    .h    { font-size: 19px; font-weight: 700; }
+    .sm   { font-size: 12.5px; }
+  </style>
+  <rect class="bg" x="0" y="0" width="980" height="560"/>
+
+  <text class="h ink" x="40" y="44">Sonic The Hedgehog's Gameworld, on a Mega Drive</text>
+  <text class="sm sub" x="40" y="66">A Sega Pico has a pen on a tablet, a page sensor under the storyware, a D-pad and one red button. This is where each of them went.</text>
+
+  <!-- ===== the Pico ===== -->
+  <text class="tb ink" x="40" y="108">The Pico</text>
+  <!-- case -->
+  <rect class="case" x="40" y="124" width="380" height="250" rx="18"/>
+  <!-- storyware (the book) -->
+  <rect class="screenish" x="66" y="146" width="236" height="120" rx="6"/>
+  <line x1="184" y1="146" x2="184" y2="266" stroke="#3a3a3a" stroke-width="2"/>
+  <text class="sm sub" x="92" y="196">storyware,</text>
+  <text class="sm sub" x="92" y="212">6 pages</text>
+  <text class="sm sub" x="206" y="204">page sensor</text>
+  <!-- tablet -->
+  <rect class="btn" x="66" y="282" width="236" height="68" rx="6"/>
+  <text class="sm sub" x="120" y="322">drawing tablet (pen position)</text>
+  <!-- pen -->
+  <path class="lead" d="M330 300 q40 -30 58 -84" stroke-dasharray="0"/>
+  <rect class="btn" x="326" y="292" width="16" height="58" rx="7"/>
+  <text class="sm sub" x="314" y="368">pen</text>
+  <!-- d-pad -->
+  <g transform="translate(344,160)">
+    <rect class="btn" x="0" y="18" width="54" height="18" rx="4"/>
+    <rect class="btn" x="18" y="0" width="18" height="54" rx="4"/>
+    <text class="sm sub" x="-6" y="74">D-pad</text>
+  </g>
+  <!-- red button -->
+  <circle class="btn" cx="371" cy="258" r="17"/>
+  <text class="sm sub" x="336" y="294">red button</text>
+
+  <!-- ===== the pad ===== -->
+  <text class="tb ink" x="560" y="108">The Mega Drive pad</text>
+  <rect class="case" x="560" y="124" width="380" height="170" rx="60"/>
+  <!-- d-pad -->
+  <g transform="translate(610,176)">
+    <rect class="btn" x="0" y="22" width="66" height="22" rx="5"/>
+    <rect class="btn" x="22" y="0" width="22" height="66" rx="5"/>
+  </g>
+  <!-- face buttons -->
+  <circle class="btn" cx="790" cy="222" r="20"/><text class="tb ink" x="783" y="228">A</text>
+  <circle class="btn" cx="842" cy="210" r="20"/><text class="tb ink" x="835" y="216">B</text>
+  <circle class="btn" cx="894" cy="198" r="20"/><text class="tb ink" x="887" y="204">C</text>
+  <!-- start -->
+  <rect class="btn" x="726" y="248" width="52" height="16" rx="8"/>
+  <text class="sm sub" x="722" y="282">START</text>
+
+  <!-- ===== the mapping ===== -->
+  <text class="tb ink" x="40" y="424">What each control does</text>
+  <g class="t ink">
+    <text x="40"  y="456">D-pad</text>
+    <text x="180" y="456" class="sub">moves the hand on screen, which is always visible</text>
+    <text x="40"  y="482">A</text>
+    <text x="180" y="482" class="sub">switches the D-pad between the hand and the game's own directions</text>
+    <text x="40"  y="508">B</text>
+    <text x="180" y="508" class="sub">taps where the hand is, which is the pen's tip switch</text>
+    <text x="40"  y="534">C + Left / Right</text>
+    <text x="180" y="534" class="sub">turns the storyware page, wrapping through closed</text>
+    <text x="560" y="456">START</text>
+    <text x="640" y="456" class="sub">the Pico's red button</text>
+    <text x="560" y="482" class="sub" font-size="13">The hand parks in the corner while the game has the D-pad,</text>
+    <text x="560" y="500" class="sub" font-size="13">so you can always see which of the two is holding it.</text>
+    <text x="560" y="528" class="sub" font-size="13">The pen's position cannot be aimed by a pad, so the hand is</text>
+    <text x="560" y="546" class="sub" font-size="13">moved rather than pointed.</text>
+  </g>
+
+  <!-- leader lines from pad to pico -->
+  <path class="lead" d="M643 210 C 520 210, 500 190, 420 186"/>
+  <path class="lead" d="M790 242 C 700 330, 520 330, 395 300"/>
+  <path class="lead" d="M842 230 C 760 360, 420 392, 334 352"/>
+  <path class="lead" d="M752 264 C 650 300, 470 286, 388 268"/>
+</svg>
