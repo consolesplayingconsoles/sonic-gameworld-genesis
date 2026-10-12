@@ -5,7 +5,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
-[ -f "$HERE/.env" ] || { echo "[ERROR] no .env: copy .env.sample to .env and fill PICO_ROM"; exit 1; }
+[ -f "$HERE/.env" ] || { echo "[ERROR] no .env: create it with PICO_ROM"; exit 1; }
 set -a; . "$HERE/.env"; set +a
 
 : "${PICO_ROM:?[ERROR] PICO_ROM is empty: point it at the Pico dump to patch}"
